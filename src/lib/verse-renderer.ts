@@ -221,7 +221,7 @@ function roundRect(
 function drawBackground(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  imageCache?: Map<string, HTMLImageElement>,
+  imageCache?: Map<string, HTMLImageElement | HTMLVideoElement>,
 ): void {
   const { width, height } = theme.resolution
   const bg = theme.background
@@ -294,7 +294,17 @@ function drawBackground(
       let drawW = width
       let drawH = height
 
-      const imgRatio = img.naturalWidth / img.naturalHeight
+      const isVideo = img instanceof HTMLVideoElement
+      const mediaW = isVideo ? (img as HTMLVideoElement).videoWidth : (img as HTMLImageElement).naturalWidth
+      const mediaH = isVideo ? (img as HTMLVideoElement).videoHeight : (img as HTMLImageElement).naturalHeight
+
+      // If media hasn't loaded its metadata yet, skip drawing or draw fallback
+      if (mediaW === 0 || mediaH === 0) {
+        ctx.restore()
+        return
+      }
+
+      const imgRatio = mediaW / mediaH
       const canvasRatio = width / height
 
       switch (bg.image.fit) {

@@ -12,6 +12,7 @@ export function LiveOutputPanel() {
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const liveImage = useBroadcastStore((s) => s.liveImage)
   const liveImageFit = useBroadcastStore((s) => s.liveImageFit)
+  const showVerseOnMedia = useBroadcastStore((s) => s.showVerseOnMedia)
 
   // Read the same data source as the preview panel
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
@@ -34,11 +35,16 @@ export function LiveOutputPanel() {
   const translation =
     translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
 
-  const verseData = deriveLiveVerse({
+  let verseData = deriveLiveVerse({
     isLive,
     selectedVerse,
     translation,
   })
+
+  // If media is live and overlay is disabled, hide the verse text in the preview
+  if (isLive && liveImage && !showVerseOnMedia) {
+    verseData = null
+  }
 
   useEffect(() => {
     useBroadcastStore.getState().setLiveVerse(verseData)

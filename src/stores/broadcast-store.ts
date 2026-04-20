@@ -17,6 +17,7 @@ interface BroadcastState {
   imageLibrary: string[]
   liveImage: string | null
   liveImageFit: "cover" | "contain" | "stretch"
+  showVerseOnMedia: boolean
 
   // Designer state
   isDesignerOpen: boolean
@@ -44,6 +45,7 @@ interface BroadcastState {
   removeImageFromLibrary: (path: string) => void
   setLiveImage: (url: string | null) => void
   setLiveImageFit: (fit: "cover" | "contain" | "stretch") => void
+  setShowVerseOnMedia: (show: boolean) => void
 
   // Designer actions
   setDesignerOpen: (open: boolean) => void
@@ -111,6 +113,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   imageLibrary: [],
   liveImage: null,
   liveImageFit: "cover",
+  showVerseOnMedia: true,
   isDesignerOpen: false,
   editingThemeId: null,
   draftTheme: null,
@@ -195,7 +198,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       }
       void emitTo(label, "broadcast:verse-update", {
         theme: imageTheme,
-        verse: null,
+        verse: s.showVerseOnMedia ? s.liveVerse : null,
       }).catch(() => {})
       return
     }
@@ -235,6 +238,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   setLiveImageFit: (liveImageFit) => {
     set({ liveImageFit })
+    get().syncBroadcastOutput()
+  },
+  setShowVerseOnMedia: (showVerseOnMedia) => {
+    set({ showVerseOnMedia })
     get().syncBroadcastOutput()
   },
 

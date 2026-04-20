@@ -18,8 +18,9 @@ export const CanvasVerse = memo(function CanvasVerse({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
   
-  const [imageCache, setImageCache] = useState<Map<string, HTMLImageElement>>(new Map())
+  const [imageCache, setImageCache] = useState<Map<string, HTMLImageElement | HTMLVideoElement>>(new Map())
   const [imageLoaded, setImageLoaded] = useState(0)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
 
   // Measure container width with ResizeObserver
   useEffect(() => {
@@ -37,18 +38,50 @@ export const CanvasVerse = memo(function CanvasVerse({
   // Load background image if needed
   useEffect(() => {
     const bg = theme.background
-    if (bg.type !== "image" || !bg.image?.url) return
+    if (bg.type !== "image" || !bg.image?.url) {
+      setIsVideoPlaying(false)
+      return
+    }
     const url = bg.image.url
-    if (imageCache.has(url)) return
+    const isVideo = /\.(mp4|webm)$/i.test(url)
+    
+    if (imageCache.has(url)) {
+      if (isVideo) setIsVideoPlaying(true)
+      return
+    }
 
-    const img = new Image()
-    img.onload = () => {
-      setImageCache((prev) => {
-        const next = new Map(prev)
-        next.set(url, img)
-        return next
-      })
-      setImageLoaded((n) => n + 1)
+    const loadMedia = (srcUrl: string) => {
+      if (isVideo) {
+        const vid = document.createElement('video')
+        vid.muted = true
+        vid.loop = true
+        vid.playsInline = true
+        vid.onloadeddata = () => {
+          setImageCache((prev) => {
+            const next = new Map(prev)
+            next.set(url, vid)
+            return next
+          })
+          setIsVideoPlaying(true)
+          vid.play().catch(console.error)
+          setImageLoaded((n) => n + 1)
+        }
+        vid.onerror = () => console.warn("Failed to load video", srcUrl)
+        vid.src = srcUrl
+        vid.load()
+      } else {
+        const img = new Image()
+        img.onload = () => {
+          setImageCache((prev) => {
+            const next = new Map(prev)
+            next.set(url, img)
+            return next
+          })
+          setImageLoaded((n) => n + 1)
+        }
+        img.onerror = () => console.warn("Failed to load image", srcUrl)
+        img.src = srcUrl
+      }
     }
 
     if (url.startsWith("/") || url.match(/^[a-zA-Z]:\\/)) {
@@ -60,12 +93,14 @@ export const CanvasVerse = memo(function CanvasVerse({
           else if (ext === 'jpg' || ext === 'jpeg') type = 'image/jpeg';
           else if (ext === 'webp') type = 'image/webp';
           else if (ext === 'gif') type = 'image/gif';
+          else if (ext === 'mp4') type = 'video/mp4';
+          else if (ext === 'webm') type = 'video/webm';
           const blob = new Blob([bytes], { type });
-          img.src = URL.createObjectURL(blob);
-        }).catch(() => { img.src = url })
+          loadMedia(URL.createObjectURL(blob))
+        }).catch(() => loadMedia(url))
       })
     } else {
-      img.src = url
+      loadMedia(url)
     }
   }, [theme.background, imageCache])
 
@@ -88,8 +123,22 @@ export const CanvasVerse = memo(function CanvasVerse({
 
     ctx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderVerse(ctx, theme, verse, { scale, imageCache })
-  }, [theme, verse, containerWidth, imageCache, imageLoaded])
+    
+    let animationFrameId: number;
+
+    const render = () => {
+      renderVerse(ctx, theme, verse, { scale, imageCache })
+      if (isVideoPlaying) {
+        animationFrameId = requestAnimationFrame(render)
+      }
+    }
+
+    render()
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+    }
+  }, [theme, verse, containerWidth, imageCache, imageLoaded, isVideoPlaying])
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>

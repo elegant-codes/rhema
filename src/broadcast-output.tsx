@@ -32,7 +32,8 @@ interface BroadcastPayload {
 function BroadcastCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const latestData = useRef<BroadcastPayload | null>(null)
-  const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
+  const imageCacheRef = useRef<Map<string, HTMLImageElement | HTMLVideoElement>>(new Map())
+  const isVideoPlayingRef = useRef(false)
   const ndiConfigRef = useRef<NdiConfigEventPayload>({
     active: false,
     fps: 24,
@@ -82,20 +83,46 @@ function BroadcastCanvas() {
 
   const preloadBackgroundImage = useCallback((theme: BroadcastTheme) => {
     const bg = theme.background
-    if (bg.type !== "image" || !bg.image?.url) return
+    if (bg.type !== "image" || !bg.image?.url) {
+      isVideoPlayingRef.current = false
+      return
+    }
 
     const url = bg.image.url
+    const isVideo = /\.(mp4|webm)$/i.test(url)
+    
     const cache = imageCacheRef.current
-    if (cache.has(url)) return
-
-    const img = new Image()
-    img.onload = () => {
-      cache.set(url, img)
-      logDebug("Background image loaded", { url })
-      draw()
+    if (cache.has(url)) {
+      isVideoPlayingRef.current = isVideo
+      return
     }
-    img.onerror = () => {
-      console.warn("[broadcast-output] failed to load background image", { url })
+
+    const loadMedia = (srcUrl: string) => {
+      if (isVideo) {
+        const vid = document.createElement('video')
+        vid.muted = true
+        vid.loop = true
+        vid.playsInline = true
+        vid.onloadeddata = () => {
+          cache.set(url, vid)
+          logDebug("Background video loaded", { url })
+          isVideoPlayingRef.current = true
+          vid.play().catch(console.error)
+          draw()
+        }
+        vid.onerror = () => console.warn("[broadcast-output] failed to load background video", { srcUrl })
+        vid.src = srcUrl
+        vid.load()
+      } else {
+        const img = new Image()
+        img.onload = () => {
+          cache.set(url, img)
+          logDebug("Background image loaded", { url })
+          draw()
+        }
+        img.onerror = () => console.warn("[broadcast-output] failed to load background image", { srcUrl })
+        img.src = srcUrl
+      }
     }
 
     // Use Tauri's readFile for local paths to bypass WebView restrictions
@@ -108,15 +135,17 @@ function BroadcastCanvas() {
           else if (ext === 'jpg' || ext === 'jpeg') type = 'image/jpeg';
           else if (ext === 'webp') type = 'image/webp';
           else if (ext === 'gif') type = 'image/gif';
+          else if (ext === 'mp4') type = 'video/mp4';
+          else if (ext === 'webm') type = 'video/webm';
           const blob = new Blob([bytes], { type });
-          img.src = URL.createObjectURL(blob);
+          loadMedia(URL.createObjectURL(blob));
         }).catch((err) => {
           console.warn("[broadcast-output] readFile failed", err);
-          img.src = url; // Fallback
+          loadMedia(url); // Fallback
         })
       })
     } else {
-      img.src = url
+      loadMedia(url)
     }
   }, [draw, logDebug])
 
@@ -244,11 +273,39 @@ function BroadcastCanvas() {
   useEffect(() => {
     const timer = setInterval(() => {
       if (!ndiConfigRef.current.active) return
+      if (isVideoPlayingRef.current) return // video loop already pushing frames
       const elapsed = Date.now() - lastPushRef.current
       if (elapsed > 2000) void pushNdiFrame()
     }, 2000)
     return () => clearInterval(timer)
   }, [pushNdiFrame])
+
+  // Animation loop for video playback
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTime = 0;
+
+    const loop = (time: number) => {
+      animationFrameId = requestAnimationFrame(loop);
+      
+      if (!isVideoPlayingRef.current) return;
+      
+      // Throttle to NDI FPS (fallback to 30)
+      const fps = ndiConfigRef.current.fps || 30;
+      const interval = 1000 / fps;
+      
+      if (time - lastTime >= interval) {
+        lastTime = time - (time % interval);
+        draw();
+        if (ndiConfigRef.current.active) {
+          void pushNdiFrame();
+        }
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [draw, pushNdiFrame]);
 
   return (
     <canvas

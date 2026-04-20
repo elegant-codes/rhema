@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { open } from "@tauri-apps/plugin-dialog"
-import { readFile } from "@tauri-apps/plugin-fs"
+import { readFile, stat } from "@tauri-apps/plugin-fs"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { useBroadcastStore } from "@/stores"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { PlusIcon, TrashIcon, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 
 function getMimeType(path: string) {
   const ext = path.split('.').pop()?.toLowerCase();
@@ -19,11 +20,15 @@ function getMimeType(path: string) {
     case 'gif': return 'image/gif';
     case 'bmp': return 'image/bmp';
     case 'avif': return 'image/avif';
+    case 'mp4': return 'video/mp4';
+    case 'webm': return 'video/webm';
     default: return 'application/octet-stream';
   }
 }
 
-function LocalImage({ path, ...props }: { path: string } & React.ImgHTMLAttributes<HTMLImageElement>) {
+const isVideo = (path: string) => /\.(mp4|webm)$/i.test(path);
+
+function LocalMedia({ path, ...props }: { path: string } & React.HTMLAttributes<HTMLElement>) {
   const [src, setSrc] = useState<string | undefined>(undefined);
   
   useEffect(() => {
@@ -31,11 +36,15 @@ function LocalImage({ path, ...props }: { path: string } & React.ImgHTMLAttribut
     let objectUrl = "";
     readFile(path).then((bytes) => {
       if (!active) return;
+      if (bytes.length > 50 * 1024 * 1024) {
+        console.warn(`File is too large (${Math.round(bytes.length / 1024 / 1024)}MB): ${path}`)
+        return;
+      }
       const blob = new Blob([bytes], { type: getMimeType(path) });
       objectUrl = URL.createObjectURL(blob);
       setSrc(objectUrl);
     }).catch((err) => {
-      console.warn("Failed to load local image:", err)
+      console.warn("Failed to load local media:", err)
     });
     
     return () => {
@@ -44,7 +53,12 @@ function LocalImage({ path, ...props }: { path: string } & React.ImgHTMLAttribut
     };
   }, [path]);
 
-  return src ? <img src={src} {...props} /> : <div className="h-full w-full bg-muted animate-pulse" />;
+  if (!src) return <div className="h-full w-full bg-muted animate-pulse" />;
+  
+  if (isVideo(path)) {
+    return <video src={src} autoPlay muted loop playsInline {...props as React.VideoHTMLAttributes<HTMLVideoElement>} />;
+  }
+  return <img src={src} {...props as React.ImgHTMLAttributes<HTMLImageElement>} />;
 }
 
 export function ImageLibraryPanel() {
@@ -55,6 +69,8 @@ export function ImageLibraryPanel() {
   const setLiveImage = useBroadcastStore((s) => s.setLiveImage)
   const liveImageFit = useBroadcastStore((s) => s.liveImageFit)
   const setLiveImageFit = useBroadcastStore((s) => s.setLiveImageFit)
+  const showVerseOnMedia = useBroadcastStore((s) => s.showVerseOnMedia)
+  const setShowVerseOnMedia = useBroadcastStore((s) => s.setShowVerseOnMedia)
   
   const [isDragging, setIsDragging] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -63,14 +79,31 @@ export function ImageLibraryPanel() {
   useEffect(() => {
     let unlisten: () => void
     const setupListener = async () => {
-      unlisten = await getCurrentWebviewWindow().onDragDropEvent((event) => {
+      unlisten = await getCurrentWebviewWindow().onDragDropEvent(async (event) => {
         if (event.payload.type === 'drop') {
           setIsDragging(false)
-          const images = event.payload.paths.filter((p) =>
-            /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(p)
+          const paths = event.payload.paths.filter((p) =>
+            /\.(png|jpe?g|webp|gif|bmp|avif|mp4|webm)$/i.test(p)
           )
-          if (images.length > 0) {
-            addImageToLibrary(images)
+          
+          if (paths.length > 0) {
+            const validPaths: string[] = []
+            for (const p of paths) {
+              try {
+                const info = await stat(p)
+                if (info.size <= 50 * 1024 * 1024) {
+                  validPaths.push(p)
+                } else {
+                  console.warn(`File skipped (over 50MB): ${p}`)
+                }
+              } catch (e) {
+                console.warn("Failed to stat file, skipping size check:", e)
+                validPaths.push(p)
+              }
+            }
+            if (validPaths.length > 0) {
+              addImageToLibrary(validPaths)
+            }
           }
         } else if (event.payload.type === 'enter' || event.payload.type === 'over') {
           setIsDragging(true)
@@ -92,15 +125,29 @@ export function ImageLibraryPanel() {
         multiple: true,
         filters: [
           {
-            name: "Images",
-            extensions: ["png", "jpeg", "jpg", "webp", "gif", "bmp", "avif"],
+            name: "Media",
+            extensions: ["png", "jpeg", "jpg", "webp", "gif", "bmp", "avif", "mp4", "webm"],
           },
         ],
       })
 
       if (selected) {
         const paths = Array.isArray(selected) ? selected : [selected]
-        addImageToLibrary(paths)
+        const validPaths: string[] = []
+        for (const p of paths) {
+          try {
+            const info = await stat(p)
+            if (info.size <= 50 * 1024 * 1024) {
+              validPaths.push(p)
+            } else {
+              console.warn(`File skipped (over 50MB): ${p}`)
+            }
+          } catch (e) {
+            console.warn("Failed to stat file, skipping size check:", e)
+            validPaths.push(p)
+          }
+        }
+        if (validPaths.length > 0) addImageToLibrary(validPaths)
       }
     } catch (err) {
       console.error("Failed to open file dialog", err)
@@ -118,9 +165,19 @@ export function ImageLibraryPanel() {
       <div className="flex shrink-0 items-center justify-between p-3 border-b border-border">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <ImageIcon className="size-4" />
-          Image Library
+          Media Library
         </h3>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mr-2 border-r border-border pr-2">
+            <Switch
+              id="show-verse-overlay"
+              checked={showVerseOnMedia}
+              onCheckedChange={setShowVerseOnMedia}
+            />
+            <label htmlFor="show-verse-overlay" className="text-[10px] uppercase font-bold text-muted-foreground whitespace-nowrap cursor-pointer">
+              Verse Overlay
+            </label>
+          </div>
           <Select value={liveImageFit} onValueChange={(val: any) => setLiveImageFit(val)}>
             <SelectTrigger className="h-8 w[100px] text-xs">
               <SelectValue />
@@ -133,7 +190,7 @@ export function ImageLibraryPanel() {
           </Select>
           <Button size="sm" onClick={handleOpenDialog} className="h-8 text-xs">
             <PlusIcon className="mr-1.5 size-3.5" />
-            Add Images
+            Add Media
           </Button>
         </div>
       </div>
@@ -142,9 +199,9 @@ export function ImageLibraryPanel() {
         {imageLibrary.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center p-6 border-2 border-dashed border-border rounded-lg">
             <ImageIcon className="size-8 text-muted-foreground mb-3 opacity-50" />
-            <h4 className="text-sm font-medium">No images added</h4>
+            <h4 className="text-sm font-medium">No media added</h4>
             <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">
-              Drag and drop images here, or click "Add Images" to browse your files.
+              Drag and drop media here, or click "Add Media" to browse your files. Limit: 50MB per file.
             </p>
           </div>
         ) : (
@@ -166,9 +223,8 @@ export function ImageLibraryPanel() {
                     isLive ? "border-emerald-500 ring-2 ring-emerald-500/30" : "border-transparent hover:border-muted-foreground/30"
                   )}
                 >
-                  <LocalImage
+                  <LocalMedia
                     path={path}
-                    alt={path.split(/[/\\]/).pop()}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
                   

@@ -421,7 +421,7 @@ export function SearchPanel() {
             )}
           >
             <ImageIcon className={cn("size-3.5", activeTab === "images" ? "text-lime-400" : "text-muted-foreground")} />
-            Images
+            Media
           </button>
         </div>
 
