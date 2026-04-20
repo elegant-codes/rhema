@@ -13,6 +13,11 @@ interface BroadcastState {
   isLive: boolean
   liveVerse: VerseRenderData | null
 
+  // Image Library
+  imageLibrary: string[]
+  liveImage: string | null
+  liveImageFit: "cover" | "contain" | "stretch"
+
   // Designer state
   isDesignerOpen: boolean
   editingThemeId: string | null
@@ -33,6 +38,12 @@ interface BroadcastState {
   setLiveVerse: (verse: VerseRenderData | null) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
+
+  // Image Library
+  addImageToLibrary: (paths: string[]) => void
+  removeImageFromLibrary: (path: string) => void
+  setLiveImage: (url: string | null) => void
+  setLiveImageFit: (fit: "cover" | "contain" | "stretch") => void
 
   // Designer actions
   setDesignerOpen: (open: boolean) => void
@@ -97,6 +108,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   altActiveThemeId: BUILTIN_THEMES[0].id,
   isLive: false,
   liveVerse: null,
+  imageLibrary: [],
+  liveImage: null,
+  liveImageFit: "cover",
   isDesignerOpen: false,
   editingThemeId: null,
   draftTheme: null,
@@ -169,6 +183,23 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const theme = s.themes.find((t) => t.id === themeId) ?? s.themes[0]
     if (!theme) return
 
+    if (s.liveImage) {
+      const imageTheme: BroadcastTheme = {
+        ...theme,
+        background: {
+          type: "image",
+          image: { url: s.liveImage, fit: s.liveImageFit, blur: 0, brightness: 100, tint: null },
+          color: "#000000",
+          gradient: null,
+        },
+      }
+      void emitTo(label, "broadcast:verse-update", {
+        theme: imageTheme,
+        verse: null,
+      }).catch(() => {})
+      return
+    }
+
     void emitTo(label, "broadcast:verse-update", {
       theme,
       verse: s.liveVerse,
@@ -189,6 +220,21 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   setLive: (isLive) => set({ isLive }),
   setLiveVerse: (liveVerse) => {
     set({ liveVerse })
+    get().syncBroadcastOutput()
+  },
+  
+  // Image Library
+  addImageToLibrary: (paths) => set((s) => ({ imageLibrary: [...new Set([...s.imageLibrary, ...paths])] })),
+  removeImageFromLibrary: (path) => set((s) => ({
+    imageLibrary: s.imageLibrary.filter(p => p !== path),
+    liveImage: s.liveImage === path ? null : s.liveImage
+  })),
+  setLiveImage: (liveImage) => {
+    set({ liveImage })
+    get().syncBroadcastOutput()
+  },
+  setLiveImageFit: (liveImageFit) => {
+    set({ liveImageFit })
     get().syncBroadcastOutput()
   },
 
@@ -275,6 +321,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const customThemes = (await store.get("customThemes")) as BroadcastTheme[] | undefined
       const activeId = (await store.get("activeThemeId")) as string | undefined
       const altActiveId = (await store.get("altActiveThemeId")) as string | undefined
+      const imageLibrary = (await store.get("imageLibrary")) as string[] | undefined
 
       const patch: Partial<BroadcastState> = {}
       if (customThemes && Array.isArray(customThemes) && customThemes.length > 0) {
@@ -282,6 +329,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       }
       if (activeId) patch.activeThemeId = activeId
       if (altActiveId) patch.altActiveThemeId = altActiveId
+      if (imageLibrary && Array.isArray(imageLibrary)) patch.imageLibrary = imageLibrary
 
       if (Object.keys(patch).length > 0) {
         useBroadcastStore.setState(patch)
@@ -292,7 +340,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
         const changed =
           state.themes !== prevState.themes ||
           state.activeThemeId !== prevState.activeThemeId ||
-          state.altActiveThemeId !== prevState.altActiveThemeId
+          state.altActiveThemeId !== prevState.altActiveThemeId ||
+          state.imageLibrary !== prevState.imageLibrary
         if (!changed) return
         if (saveTimer) clearTimeout(saveTimer)
         saveTimer = setTimeout(() => {
@@ -320,6 +369,7 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("customThemes", customThemes)
     await store.set("activeThemeId", state.activeThemeId)
     await store.set("altActiveThemeId", state.altActiveThemeId)
+    await store.set("imageLibrary", state.imageLibrary)
     await store.save()
   } catch {
     console.warn("[broadcast] Failed to persist themes")

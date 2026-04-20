@@ -18,6 +18,7 @@ import {
   ArrowRightIcon,
   CheckIcon,
   PlusIcon,
+  ImageIcon,
 } from "lucide-react"
 import {
   Tooltip,
@@ -30,8 +31,9 @@ import { useBibleStore, useQueueStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
+import { ImageLibraryPanel } from "./image-library-panel"
 
-type SearchTab = "book" | "context" 
+type SearchTab = "book" | "context" | "images"
 
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -409,6 +411,18 @@ export function SearchPanel() {
             <SparklesIcon className={cn("size-3.5", activeTab === "context" ? "text-lime-400" : "text-muted-foreground")} />
             Context search
           </button>
+          <button
+            onClick={() => setActiveTab("images")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "images"
+                ? "border-lime-500/50 bg-lime-500/15"
+                : "border-border bg-background  text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ImageIcon className={cn("size-3.5", activeTab === "images" ? "text-lime-400" : "text-muted-foreground")} />
+            Images
+          </button>
         </div>
 
         {activeTab === "book" ? (
@@ -487,7 +501,7 @@ export function SearchPanel() {
               </SelectContent>
             </Select>
           </div>
-        ) : (
+        ) : activeTab === "context" ? (
           <div className="flex flex-1 items-center gap-2 pr-3">
             <Input
               placeholder="Search verse text..."
@@ -517,7 +531,7 @@ export function SearchPanel() {
                 </SelectContent>
               </Select>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Quick nav tab */}
@@ -751,6 +765,11 @@ export function SearchPanel() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Image Library tab */}
+      {activeTab === "images" && (
+        <ImageLibraryPanel />
       )}
     </div>
   )

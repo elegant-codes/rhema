@@ -97,7 +97,27 @@ function BroadcastCanvas() {
     img.onerror = () => {
       console.warn("[broadcast-output] failed to load background image", { url })
     }
-    img.src = url
+
+    // Use Tauri's readFile for local paths to bypass WebView restrictions
+    if (url.startsWith("/") || url.match(/^[a-zA-Z]:\\/)) {
+      import("@tauri-apps/plugin-fs").then(({ readFile }) => {
+        readFile(url).then((bytes) => {
+          let type = "application/octet-stream";
+          const ext = url.split('.').pop()?.toLowerCase();
+          if (ext === 'png') type = 'image/png';
+          else if (ext === 'jpg' || ext === 'jpeg') type = 'image/jpeg';
+          else if (ext === 'webp') type = 'image/webp';
+          else if (ext === 'gif') type = 'image/gif';
+          const blob = new Blob([bytes], { type });
+          img.src = URL.createObjectURL(blob);
+        }).catch((err) => {
+          console.warn("[broadcast-output] readFile failed", err);
+          img.src = url; // Fallback
+        })
+      })
+    } else {
+      img.src = url
+    }
   }, [draw, logDebug])
 
   const pushNdiFrame = useCallback(async () => {

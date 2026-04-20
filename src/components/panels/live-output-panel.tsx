@@ -10,13 +10,27 @@ export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const liveImage = useBroadcastStore((s) => s.liveImage)
+  const liveImageFit = useBroadcastStore((s) => s.liveImageFit)
 
   // Read the same data source as the preview panel
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
   const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
-  const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  let activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
+  if (isLive && liveImage) {
+    activeTheme = {
+      ...activeTheme,
+      background: {
+        type: "image",
+        image: { url: liveImage, fit: liveImageFit, blur: 0, brightness: 100, tint: null },
+        color: "#000000",
+        gradient: null,
+      },
+    }
+  }
+
   const translation =
     translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
 
