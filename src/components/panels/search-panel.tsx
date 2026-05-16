@@ -19,6 +19,7 @@ import {
   CheckIcon,
   PlusIcon,
   ImageIcon,
+  MusicIcon,
 } from "lucide-react"
 import {
   Tooltip,
@@ -27,13 +28,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions } from "@/hooks/use-bible"
-import { useBibleStore, useQueueStore } from "@/stores"
+import { useBibleStore, useQueueStore, useBroadcastStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { searchContextWithFuse } from "@/lib/context-search"
 import { ImageLibraryPanel } from "./image-library-panel"
+import { LyricsPanel } from "./lyrics-panel"
 
-type SearchTab = "book" | "context" | "images"
+type SearchTab = "book" | "context" | "images" | "lyrics"
 
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -186,6 +188,7 @@ export function SearchPanel() {
   const handleVerseClick = useCallback((verse: Verse) => {
     setSelectedVerseId(verse.id)
     bibleActions.selectVerse(verse)
+    useBroadcastStore.getState().setLiveSongSlide(null, null)
   }, [])
 
   // Arrow key navigation
@@ -366,6 +369,7 @@ export function SearchPanel() {
       chapter: verse.chapter,
       verse: verse.verse
     })
+    useBroadcastStore.getState().setLiveSongSlide(null, null)
     setQuickInput("")
     setShowQuickVerses(false)
   }, [])
@@ -422,6 +426,18 @@ export function SearchPanel() {
           >
             <ImageIcon className={cn("size-3.5", activeTab === "images" ? "text-lime-400" : "text-muted-foreground")} />
             Media
+          </button>
+          <button
+            onClick={() => setActiveTab("lyrics")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "lyrics"
+                ? "border-lime-500/50 bg-lime-500/15"
+                : "border-border bg-background  text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MusicIcon className={cn("size-3.5", activeTab === "lyrics" ? "text-lime-400" : "text-muted-foreground")} />
+            Lyrics
           </button>
         </div>
 
@@ -686,6 +702,7 @@ export function SearchPanel() {
                     verse: result.verse,
                     text: result.verse_text,
                   })
+                  useBroadcastStore.getState().setLiveSongSlide(null, null)
                 }}
                 className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
               >
@@ -770,6 +787,11 @@ export function SearchPanel() {
       {/* Image Library tab */}
       {activeTab === "images" && (
         <ImageLibraryPanel />
+      )}
+
+      {/* Lyrics tab */}
+      {activeTab === "lyrics" && (
+        <LyricsPanel />
       )}
     </div>
   )

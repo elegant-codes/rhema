@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import type { BroadcastTheme, VerseRenderData, Song } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
 
 type SelectedElement = "verse" | "reference" | null
@@ -18,6 +18,11 @@ interface BroadcastState {
   liveImage: string | null
   liveImageFit: "cover" | "contain" | "stretch"
   showVerseOnMedia: boolean
+
+  // Lyrics Library
+  songs: Song[]
+  activeSongId: string | null
+  activeSlideIndex: number | null
 
   // Designer state
   isDesignerOpen: boolean
@@ -46,6 +51,12 @@ interface BroadcastState {
   setLiveImage: (url: string | null) => void
   setLiveImageFit: (fit: "cover" | "contain" | "stretch") => void
   setShowVerseOnMedia: (show: boolean) => void
+
+  // Lyrics Actions
+  addSong: (song: Omit<Song, "id" | "createdAt" | "updatedAt">) => void
+  updateSong: (id: string, updates: Partial<Omit<Song, "id" | "createdAt" | "updatedAt">>) => void
+  deleteSong: (id: string) => void
+  setLiveSongSlide: (songId: string | null, slideIndex: number | null) => void
 
   // Designer actions
   setDesignerOpen: (open: boolean) => void
@@ -114,6 +125,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   liveImage: null,
   liveImageFit: "cover",
   showVerseOnMedia: true,
+  songs: [],
+  activeSongId: null,
+  activeSlideIndex: null,
   isDesignerOpen: false,
   editingThemeId: null,
   draftTheme: null,
@@ -186,8 +200,28 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     const theme = s.themes.find((t) => t.id === themeId) ?? s.themes[0]
     if (!theme) return
 
+    // 1. Determine Content
+    let content: VerseRenderData | null = null
+
+    if (s.isLive) {
+      if (s.activeSongId !== null && s.activeSlideIndex !== null) {
+        const song = s.songs.find((sg) => sg.id === s.activeSongId)
+        const slide = song?.slides[s.activeSlideIndex]
+        if (slide) {
+          content = {
+            reference: song?.title || "",
+            segments: [{ text: slide }],
+          }
+        }
+      } else {
+        content = s.liveVerse
+      }
+    }
+
+    // 2. Determine Theme (Background)
+    let activeTheme = theme
     if (s.liveImage) {
-      const imageTheme: BroadcastTheme = {
+      activeTheme = {
         ...theme,
         background: {
           type: "image",
@@ -196,16 +230,15 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
           gradient: null,
         },
       }
-      void emitTo(label, "broadcast:verse-update", {
-        theme: imageTheme,
-        verse: s.showVerseOnMedia ? s.liveVerse : null,
-      }).catch(() => {})
-      return
+      // If media is live, check overlay setting
+      if (!s.showVerseOnMedia) {
+        content = null
+      }
     }
 
     void emitTo(label, "broadcast:verse-update", {
-      theme,
-      verse: s.liveVerse,
+      theme: activeTheme,
+      verse: content,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -220,7 +253,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({ altActiveThemeId })
     get().syncBroadcastOutputFor("alt")
   },
-  setLive: (isLive) => set({ isLive }),
+  setLive: (isLive) => {
+    set({ isLive })
+    get().syncBroadcastOutput()
+  },
   setLiveVerse: (liveVerse) => {
     set({ liveVerse })
     get().syncBroadcastOutput()
@@ -242,6 +278,38 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   setShowVerseOnMedia: (showVerseOnMedia) => {
     set({ showVerseOnMedia })
+    get().syncBroadcastOutput()
+  },
+
+  // Lyrics Actions
+  addSong: (songData) => {
+    const newSong: Song = {
+      ...songData,
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    set((s) => ({ songs: [...s.songs, newSong] }))
+  },
+  updateSong: (id, updates) => {
+    set((s) => ({
+      songs: s.songs.map((song) =>
+        song.id === id ? { ...song, ...updates, updatedAt: Date.now() } : song
+      ),
+    }))
+    // If the active song is updated, we might need to sync
+    if (get().activeSongId === id) get().syncBroadcastOutput()
+  },
+  deleteSong: (id) => {
+    set((s) => ({
+      songs: s.songs.filter((song) => song.id !== id),
+      activeSongId: s.activeSongId === id ? null : s.activeSongId,
+      activeSlideIndex: s.activeSongId === id ? null : s.activeSlideIndex,
+    }))
+    if (get().activeSongId === id) get().syncBroadcastOutput()
+  },
+  setLiveSongSlide: (songId, slideIndex) => {
+    set({ activeSongId: songId, activeSlideIndex: slideIndex, liveVerse: null })
     get().syncBroadcastOutput()
   },
 
@@ -329,6 +397,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const activeId = (await store.get("activeThemeId")) as string | undefined
       const altActiveId = (await store.get("altActiveThemeId")) as string | undefined
       const imageLibrary = (await store.get("imageLibrary")) as string[] | undefined
+      const songs = (await store.get("songs")) as Song[] | undefined
 
       const patch: Partial<BroadcastState> = {}
       if (customThemes && Array.isArray(customThemes) && customThemes.length > 0) {
@@ -337,6 +406,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       if (activeId) patch.activeThemeId = activeId
       if (altActiveId) patch.altActiveThemeId = altActiveId
       if (imageLibrary && Array.isArray(imageLibrary)) patch.imageLibrary = imageLibrary
+      if (songs && Array.isArray(songs)) patch.songs = songs
 
       if (Object.keys(patch).length > 0) {
         useBroadcastStore.setState(patch)
@@ -348,7 +418,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
           state.themes !== prevState.themes ||
           state.activeThemeId !== prevState.activeThemeId ||
           state.altActiveThemeId !== prevState.altActiveThemeId ||
-          state.imageLibrary !== prevState.imageLibrary
+          state.imageLibrary !== prevState.imageLibrary ||
+          state.songs !== prevState.songs
         if (!changed) return
         if (saveTimer) clearTimeout(saveTimer)
         saveTimer = setTimeout(() => {
@@ -377,6 +448,7 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("activeThemeId", state.activeThemeId)
     await store.set("altActiveThemeId", state.altActiveThemeId)
     await store.set("imageLibrary", state.imageLibrary)
+    await store.set("songs", state.songs)
     await store.save()
   } catch {
     console.warn("[broadcast] Failed to persist themes")

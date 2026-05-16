@@ -13,6 +13,9 @@ export function LiveOutputPanel() {
   const liveImage = useBroadcastStore((s) => s.liveImage)
   const liveImageFit = useBroadcastStore((s) => s.liveImageFit)
   const showVerseOnMedia = useBroadcastStore((s) => s.showVerseOnMedia)
+  const songs = useBroadcastStore((s) => s.songs)
+  const activeSongId = useBroadcastStore((s) => s.activeSongId)
+  const activeSlideIndex = useBroadcastStore((s) => s.activeSlideIndex)
 
   // Read the same data source as the preview panel
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
@@ -44,6 +47,18 @@ export function LiveOutputPanel() {
   // If media is live and overlay is disabled, hide the verse text in the preview
   if (isLive && liveImage && !showVerseOnMedia) {
     verseData = null
+  }
+
+  // Handle active song slide
+  if (isLive && activeSongId !== null && activeSlideIndex !== null) {
+    const song = songs.find((sg) => sg.id === activeSongId)
+    const slide = song?.slides[activeSlideIndex]
+    if (slide) {
+      verseData = {
+        reference: song?.title || "",
+        segments: [{ text: slide }],
+      }
+    }
   }
 
   useEffect(() => {

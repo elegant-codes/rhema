@@ -24,27 +24,37 @@ export function wrapText(
   text: string,
   maxWidth: number,
 ): string[] {
-  const words = text.split(" ")
-  const lines: string[] = []
-  let currentLine = ""
+  // First, split by existing newlines to respect manual "Enter" breaks
+  const paragraphs = text.split("\n")
+  const allLines: string[] = []
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word
-    const metrics = ctx.measureText(testLine)
+  for (const paragraph of paragraphs) {
+    if (paragraph.trim() === "" && paragraphs.length > 1) {
+      allLines.push("") // Keep empty lines if they were explicitly added
+      continue
+    }
 
-    if (metrics.width > maxWidth && currentLine) {
-      lines.push(currentLine)
-      currentLine = word
-    } else {
-      currentLine = testLine
+    const words = paragraph.split(" ")
+    let currentLine = ""
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word
+      const metrics = ctx.measureText(testLine)
+
+      if (metrics.width > maxWidth && currentLine) {
+        allLines.push(currentLine)
+        currentLine = word
+      } else {
+        currentLine = testLine
+      }
+    }
+
+    if (currentLine) {
+      allLines.push(currentLine)
     }
   }
 
-  if (currentLine) {
-    lines.push(currentLine)
-  }
-
-  return lines
+  return allLines
 }
 
 function alignX(
