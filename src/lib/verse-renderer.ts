@@ -403,15 +403,17 @@ function drawVerseText(
   textRectX: number,
   textRectWidth: number,
   startY: number,
+  scaledFontSize?: number
 ): number {
   const vt = theme.verseText
   const vn = theme.verseNumbers
   const verseAlign = resolveHorizontalAlign(vt.horizontalAlign, theme.layout.textAlign, true)
   const verseDecoration = resolveTextDecoration(vt.textDecoration)
-  const lineHeightPx = vt.fontSize * vt.lineHeight
+  const actualFontSize = scaledFontSize ?? vt.fontSize
+  const lineHeightPx = actualFontSize * vt.lineHeight
 
   ctx.save()
-  ctx.font = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
+  ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
   ctx.fillStyle = vt.color
   ctx.textBaseline = "top"
   ctx.textAlign = verseAlign === "justify" ? "left" : verseAlign
@@ -482,7 +484,7 @@ function drawVerseText(
         textRectX,
         currentY,
         textRectWidth,
-        vt.fontSize,
+        actualFontSize,
         textRectX,
       )
     } else {
@@ -496,7 +498,7 @@ function drawVerseText(
         x,
         currentY,
         lineWidth,
-        vt.fontSize,
+        actualFontSize,
         textRectX,
       )
     }
@@ -758,6 +760,72 @@ export function computeVerseLayoutMetrics(
   return { scaledTheme, textAreaRect, textRect, referenceRect, verseRect }
 }
 
+function calculateMaxAvailableVerseHeight(
+  theme: BroadcastTheme,
+  textRect: VerseLayoutRect,
+  referenceHeight: number
+): number {
+  const referenceGap = Math.max(
+    0,
+    // 0.5 x fontSize scales naturally with different themes
+    theme.layout.referenceGap ?? theme.reference.fontSize * 0.5
+  )
+
+  switch (theme.reference.position) {
+    case "above":
+      return textRect.height - referenceHeight
+    case "below":
+      return textRect.height - referenceHeight - referenceGap
+    case "inline":
+    default:
+      return textRect.height
+  }
+}
+
+function calculateScaledFontSize(
+  ctx: CanvasRenderingContext2D,
+  theme: BroadcastTheme,
+  verse: VerseRenderData,
+  textRectWidth: number,
+  maxHeight: number
+): number {
+  const originalFontSize = theme.verseText.fontSize
+  const minFontSize = Math.max(8, originalFontSize * 0.3) // Don't go below 30% of original or 8px
+
+  // Binary search for optimal font size
+  let low = minFontSize
+  let high = originalFontSize
+  let bestFit = originalFontSize
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2)
+
+    // Simulate a temporary theme with the test font size
+    const testTheme = {
+      ...theme,
+      verseText: {
+        ...theme.verseText,
+        fontSize: mid,
+      },
+    }
+
+    // If I use this font size, how tall will the verse be?
+    const metrics = measureVerseHeight(ctx, testTheme, verse, textRectWidth)
+
+    // Check if the rendered verse is still too big to fit
+    if (metrics.height <= maxHeight) {
+      // Increase the font size
+      bestFit = mid
+      low = mid + 1
+    } else {
+      // Doesn't fit, decrease the font size
+      high = mid - 1
+    }
+  }
+
+  return bestFit
+}
+
 export function renderVerse(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
@@ -817,6 +885,20 @@ function renderVerseImpl(
   const referenceRect = metrics.referenceRect
   const verseRect = metrics.verseRect
   if (verseRect) {
+    const maxAvailableVerseHeight = calculateMaxAvailableVerseHeight(
+      scaledTheme,
+      metrics.textRect,
+      referenceRect?.height ?? 0
+    )
+
+    const scaledFontSize = calculateScaledFontSize(
+      ctx,
+      scaledTheme,
+      verse,
+      metrics.textAreaRect.width,
+      maxAvailableVerseHeight
+    )
+
     drawVerseText(
       ctx,
       scaledTheme,
@@ -824,6 +906,7 @@ function renderVerseImpl(
       metrics.textRect.x,
       metrics.textRect.width,
       verseRect.y,
+      scaledFontSize
     )
   }
   if (referenceRect) {
