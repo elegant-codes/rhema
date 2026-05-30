@@ -98,15 +98,14 @@ export function SearchPanel() {
 
   const selectedBookNumber = selectedBook?.book_number
 
-  // Load initial data and default to Genesis 1:1
+  // Load initial data and default to Genesis 1 without selecting a verse
   useEffect(() => {
     bibleActions.loadTranslations().catch(console.error)
-    bibleActions.loadBooks().then(() => {
-      useBibleStore.getState().setPendingNavigation({
-        bookNumber: 1,
-        chapter: 1,
-        verse: 1,
-      })
+    bibleActions.loadBooks().then((loadedBooks) => {
+      if (loadedBooks.length > 0) {
+        setSelectedBook(loadedBooks[0])
+        setChapter(1)
+      }
     }).catch(console.error)
   }, [])
 
