@@ -29,7 +29,9 @@ export function LyricsPanel() {
 
   const [searchQuery, setSearchQuery] = useState("")
   const [editingSongId, setEditingSongId] = useState<string | null>(null)
-  const [selectedSongId, setSelectedSongId] = useState<string | null>(null)
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(
+    () => useBroadcastStore.getState().activeSongId
+  )
 
   // Form state for new/edit
   const [formTitle, setFormTitle] = useState("")
