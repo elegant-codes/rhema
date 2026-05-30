@@ -302,17 +302,13 @@ export function SearchPanel() {
   )
   const quickSuggestion = autocompleteResult.suggestion
 
-  // Side effects only: navigation + verse loading
+  // Side effects only: verse loading for the dropdown
   useEffect(() => {
     const result = autocompleteResult
 
+    // Focus restoration logic removed from here as it should be handled 
+    // by the UI, but we still ensure the input stays focused if needed.
     if (result.matchedBook && result.chapter && result.verse) {
-      useBibleStore.getState().setPendingNavigation({
-        bookNumber: result.matchedBook.book_number,
-        chapter: result.chapter,
-        verse: result.verse
-      })
-
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (quickInputRef.current && document.activeElement !== quickInputRef.current) {
@@ -347,9 +343,18 @@ export function SearchPanel() {
       return
     }
 
-    // Enter clears input (verse is already showing in panel)
+    // Enter triggers navigation if a verse is matched
     if (e.key === "Enter") {
       e.preventDefault()
+      const result = autocompleteResult
+      if (result.matchedBook && result.chapter && result.verse) {
+        useBibleStore.getState().setPendingNavigation({
+          bookNumber: result.matchedBook.book_number,
+          chapter: result.chapter,
+          verse: result.verse
+        })
+        useBroadcastStore.getState().setLiveSongSlide(null, null)
+      }
       setQuickInput("")
       setShowQuickVerses(false)
       return
@@ -362,7 +367,7 @@ export function SearchPanel() {
       setShowQuickVerses(false)
       return
     }
-  }, [quickInput, quickSuggestion])
+  }, [quickInput, quickSuggestion, autocompleteResult])
 
   const handleQuickVerseClick = useCallback((verse: Verse) => {
     useBibleStore.getState().setPendingNavigation({
