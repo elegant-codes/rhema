@@ -197,12 +197,14 @@ export function SearchPanel() {
         e.preventDefault()
         if (chapter > 1) {
           setChapter((c) => c - 1)
-            setSelectedVerseId(null)
+          setSelectedVerseId(null)
+          bibleActions.selectVerse(null)
         }
       } else if (e.key === "ArrowRight") {
         e.preventDefault()
         setChapter((c) => c + 1)
         setSelectedVerseId(null)
+        bibleActions.selectVerse(null)
       } else if (e.key === "ArrowDown") {
         e.preventDefault()
         if (currentChapter.length === 0) return
@@ -569,7 +571,8 @@ export function SearchPanel() {
                 onClick={() => {
                   if (chapter > 1) {
                     setChapter((c) => c - 1)
-                                setSelectedVerseId(null)
+                    setSelectedVerseId(null)
+                    bibleActions.selectVerse(null)
                   }
                 }}
                 disabled={chapter <= 1}
@@ -581,7 +584,8 @@ export function SearchPanel() {
                 size="icon-xs"
                 onClick={() => {
                   setChapter((c) => c + 1)
-                            setSelectedVerseId(null)
+                  setSelectedVerseId(null)
+                  bibleActions.selectVerse(null)
                 }}
               >
                 <ArrowRightIcon className="size-3" />
