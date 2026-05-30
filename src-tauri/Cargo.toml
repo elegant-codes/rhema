@@ -68,6 +68,7 @@ base64 = "0.22"
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-persisted-scope = "2.3.7"
 
 [features]
 default = ["whisper"]
