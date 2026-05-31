@@ -48,14 +48,16 @@ export function normalizeInput(input: string): string {
 }
 
 /**
- * Find matching book by name or abbreviation (case insensitive)
+ * Find matching book by name or abbreviation (case insensitive).
+ * Normalizes both the input and the target book names to handle translations
+ * that use "1 Corinthians" instead of "I Corinthians".
  */
 export function findMatchingBook(bookInput: string, books: Book[]): Book | undefined {
-  const normalized = bookInput.toLowerCase()
+  const normalizedInput = normalizeInput(bookInput).toLowerCase()
   return books.find(
     b =>
-      b.name.toLowerCase().startsWith(normalized) ||
-      b.abbreviation.toLowerCase().startsWith(normalized)
+      normalizeInput(b.name).toLowerCase().startsWith(normalizedInput) ||
+      normalizeInput(b.abbreviation).toLowerCase().startsWith(normalizedInput)
   )
 }
 
@@ -76,12 +78,12 @@ export function getAutocompleteSuggestion(
 
   // Check if it's just a number (for numbered books like "1", "2", "3")
   if (/^\d+$/.test(trimmed)) {
-    const matchingBook = books.find(b => b.name.startsWith(normalizedInput + " "))
+    const matchingBook = books.find(b => normalizeInput(b.name).startsWith(normalizedInput + " "))
 
     if (matchingBook) {
-      const remainder = matchingBook.name.slice(normalizedInput.length)
+      // Return the actual name from the book instead of trying to reconstruct it
       return {
-        suggestion: normalizedInput + remainder + " 1:1",
+        suggestion: matchingBook.name + " 1:1",
         matchedBook: matchingBook,
         chapter: 1,
         verse: 1,
@@ -172,7 +174,7 @@ export function getTabNavigationResult(
   const suggestionTrimmed = currentSuggestion.trim()
 
   // Extract the full book name from the suggestion
-  const bookNameMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+)\s+\d+:\d+$/)
+  const bookNameMatch = suggestionTrimmed.match(/^((?:[IVX]+|\d+)?\s*[a-zA-Z\s]+)\s+\d+:\d+$/)
 
   if (bookNameMatch) {
     const fullBookName = bookNameMatch[1]
@@ -193,7 +195,7 @@ export function getTabNavigationResult(
 
     // Stage 2: Has chapter -> advance to chapter with colon
     if (hasChapter) {
-      const chapterMatch = suggestionTrimmed.match(/^(([IVX]+\s+)?[a-zA-Z\s]+\s+\d+):\d+$/)
+      const chapterMatch = suggestionTrimmed.match(/^((?:[IVX]+|\d+)?\s*[a-zA-Z\s]+\s+\d+):\d+$/)
       if (chapterMatch) {
         return chapterMatch[1] + ":"
       }
