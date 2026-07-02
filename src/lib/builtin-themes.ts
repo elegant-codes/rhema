@@ -40,8 +40,8 @@ const CLASSIC_DARK: BroadcastTheme = {
   },
   verseText: {
     fontFamily: "Source Serif 4 Variable",
-    fontSize: 72,
-    fontWeight: 400,
+    fontSize: 90,
+    fontWeight: 700,
     color: "#ffffff",
     horizontalAlign: "center",
     verticalAlign: "top",
@@ -110,8 +110,8 @@ const MODERN_LIGHT: BroadcastTheme = {
   },
   verseText: {
     fontFamily: "Geist Variable",
-    fontSize: 68,
-    fontWeight: 400,
+    fontSize: 85,
+    fontWeight: 600,
     color: "#1a1a1a",
     horizontalAlign: "left",
     verticalAlign: "top",
@@ -180,8 +180,8 @@ const BROADCAST_OVERLAY: BroadcastTheme = {
   },
   verseText: {
     fontFamily: "Geist Variable",
-    fontSize: 64,
-    fontWeight: 500,
+    fontSize: 76,
+    fontWeight: 700,
     color: "#ffffff",
     horizontalAlign: "center",
     verticalAlign: "top",

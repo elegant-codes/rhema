@@ -13,7 +13,7 @@ export interface RenderOptions {
   offsetX?: number
   offsetY?: number
   scale?: number               // Scale factor for rendering at display size (e.g., 0.42 for 400px panel)
-  imageCache?: Map<string, HTMLImageElement>
+  imageCache?: Map<string, HTMLImageElement | HTMLVideoElement>
 }
 
 export type TextHorizontalAlign = "left" | "center" | "right" | "justify"
