@@ -10,6 +10,8 @@ import {
   useQueueStore,
   useBibleStore,
   useTranscriptStore,
+  useSettingsStore,
+  useBroadcastStore,
 } from "@/stores"
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
@@ -61,6 +63,8 @@ export function TranscriptPanel() {
   const hasPartial = useTranscriptStore((s) => s.currentPartial.length > 0)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const lastAutoSelectTime = useRef(0)
+
   useTauriEvent<{ rms: number; peak: number }>("audio_level", (payload) => {
     useAudioStore.getState().setLevel(payload)
   })
@@ -78,30 +82,52 @@ export function TranscriptPanel() {
   useTauriEvent<DetectionResult[]>("verse_detections", (detections) => {
     useDetectionStore.getState().addDetections(detections)
 
-    // Auto-navigate book search + select verse for preview/live
-    const directHit = detections.find(
-      (d) => d.source === "direct" && !d.is_chapter_only
-    )
-    if (directHit && directHit.book_number > 0) {
-      // Select verse immediately so preview/live panels update
-      bibleActions.selectVerse({
-        id: 0,
-        translation_id: useBibleStore.getState().activeTranslationId,
-        book_number: directHit.book_number,
-        book_name: directHit.book_name,
-        book_abbreviation: "",
-        chapter: directHit.chapter,
-        verse: directHit.verse,
-        text: directHit.verse_text,
-      })
-      // Navigate book search panel to this verse
-      useBibleStore
-        .getState()
-        .setPendingNavigation({
+    // Auto-navigate book search + select verse for preview/live if in auto mode
+    const { autoMode, cooldownMs } = useSettingsStore.getState()
+    const now = Date.now()
+
+    if (autoMode && now - lastAutoSelectTime.current >= cooldownMs) {
+      const directHit = detections.find(
+        (d) => d.source === "direct" && !d.is_chapter_only
+      )
+      if (directHit && directHit.book_number > 0) {
+        lastAutoSelectTime.current = now
+        // Select verse immediately so preview/live panels update
+        bibleActions.selectVerse({
+          id: 0,
+          translation_id: useBibleStore.getState().activeTranslationId,
+          book_number: directHit.book_number,
+          book_name: directHit.book_name,
+          book_abbreviation: "",
+          chapter: directHit.chapter,
+          verse: directHit.verse,
+          text: directHit.verse_text,
+        })
+        // Navigate book search panel to this verse
+        const bibleStore = useBibleStore.getState()
+        bibleStore.setPendingNavigation({
           bookNumber: directHit.book_number,
           chapter: directHit.chapter,
           verse: directHit.verse,
         })
+        
+        // Push to live output with the REAL verse text from the active translation
+        const translation = bibleStore.translations.find((t) => t.id === bibleStore.activeTranslationId)?.abbreviation ?? "KJV"
+        bibleActions.fetchVerse(directHit.book_number, directHit.chapter, directHit.verse)
+          .then((actualVerse) => {
+            if (actualVerse) {
+              useBroadcastStore.getState().setLiveVerse({
+                reference: `${directHit.book_name} ${directHit.chapter}:${directHit.verse} (${translation})`,
+                segments: [{ verseNumber: directHit.verse, text: actualVerse.text }]
+              })
+              useBroadcastStore.getState().setLive(true)
+              import("@/stores").then(({ useHistoryStore }) => {
+                useHistoryStore.getState().addItem(actualVerse, bibleStore.activeTranslationId)
+              })
+            }
+          })
+          .catch(console.error)
+      }
     }
 
     // Auto-queue high-confidence detections

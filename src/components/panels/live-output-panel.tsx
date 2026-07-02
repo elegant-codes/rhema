@@ -17,10 +17,7 @@ export function LiveOutputPanel() {
   const activeSongId = useBroadcastStore((s) => s.activeSongId)
   const activeSlideIndex = useBroadcastStore((s) => s.activeSlideIndex)
 
-  // Read the same data source as the preview panel
-  const selectedVerse = useBibleStore((s) => s.selectedVerse)
-  const translations = useBibleStore((s) => s.translations)
-  const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+  const liveVerse = useBroadcastStore((s) => s.liveVerse)
 
   let activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
   if (isLive && liveImage) {
@@ -35,14 +32,7 @@ export function LiveOutputPanel() {
     }
   }
 
-  const translation =
-    translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
-
-  let verseData = deriveLiveVerse({
-    isLive,
-    selectedVerse,
-    translation,
-  })
+  let verseData = isLive ? liveVerse : null
 
   // If media is live and overlay is disabled, hide the verse text in the preview
   if (isLive && liveImage && !showVerseOnMedia) {
@@ -56,14 +46,10 @@ export function LiveOutputPanel() {
     if (slide) {
       verseData = {
         reference: song?.title || "",
-        segments: [{ text: slide }],
+        segments: [{ text: slide, verseNumber: 0 }],
       }
     }
   }
-
-  useEffect(() => {
-    useBroadcastStore.getState().setLiveVerse(verseData)
-  }, [verseData])
 
   return (
     <div

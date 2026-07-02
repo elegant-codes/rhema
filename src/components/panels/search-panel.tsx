@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions } from "@/hooks/use-bible"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { useBibleStore, useQueueStore, useBroadcastStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
@@ -607,6 +608,14 @@ export function SearchPanel() {
                   key={verse.id}
                   id={`verse-${verse.id}`}
                   onClick={() => handleVerseClick(verse)}
+                  onDoubleClick={() => {
+                    const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
+                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verse, translation))
+                    useBroadcastStore.getState().setLive(true)
+                    import("@/stores").then(({ useHistoryStore }) => {
+                      useHistoryStore.getState().addItem(verse, activeTranslationId)
+                    })
+                  }}
                   className={cn(
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                     verse.id === effectiveSelectedVerseId
@@ -697,23 +706,41 @@ export function SearchPanel() {
               </p>
             )}
             {semanticResults.map((result, idx) => (
-              <div
-                key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
-                onClick={() => {
-                  bibleActions.selectVerse({
-                    id: 0,
-                    translation_id: activeTranslationId,
-                    book_number: result.book_number,
-                    book_name: result.book_name,
-                    book_abbreviation: "",
-                    chapter: result.chapter,
-                    verse: result.verse,
-                    text: result.verse_text,
-                  })
-                  useBroadcastStore.getState().setLiveSongSlide(null, null)
-                }}
-                className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
-              >
+                <div
+                  key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
+                  onClick={() => {
+                    bibleActions.selectVerse({
+                      id: 0,
+                      translation_id: activeTranslationId,
+                      book_number: result.book_number,
+                      book_name: result.book_name,
+                      book_abbreviation: "",
+                      chapter: result.chapter,
+                      verse: result.verse,
+                      text: result.verse_text,
+                    })
+                    useBroadcastStore.getState().setLiveSongSlide(null, null)
+                  }}
+                  onDoubleClick={() => {
+                    const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
+                    const verseData = {
+                      id: 0,
+                      translation_id: activeTranslationId,
+                      book_number: result.book_number,
+                      book_name: result.book_name,
+                      book_abbreviation: "",
+                      chapter: result.chapter,
+                      verse: result.verse,
+                      text: result.verse_text,
+                    }
+                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verseData, translation))
+                    useBroadcastStore.getState().setLive(true)
+                    import("@/stores").then(({ useHistoryStore }) => {
+                      useHistoryStore.getState().addItem(verseData, activeTranslationId)
+                    })
+                  }}
+                  className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
+                >
                 <div className="flex shrink-0 flex-row items-start gap-2">
                   <span className="text-xs font-semibold ">
                     {result.book_name}   {result.chapter}:{result.verse}
