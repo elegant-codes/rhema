@@ -82,3 +82,9 @@ Take full control over the visual atmosphere of your service.
 2. **Project an Image:** Click on any image in your library to instantly project it to the live output. This will override the current background.
 3. **Clear Image:** Click the currently active image again to remove it from the screen and return to the default theme.
 4. **Customization:** Use the media controls to switch between "Cover" and "Contain" modes, or adjust the blur and brightness of the background image to ensure text remains highly readable.
+
+### How to use the File Importer
+Migrating from other worship software is easy with Rhema's Universal File Importer!
+1. **Open the Importer:** In the **Songs** panel, click the new **"Import"** button next to "Add New".
+2. **Select a File:** Choose a `.txt`, `.pro6` (ProPresenter 6), or `.xml` (OpenLyrics) file from your computer.
+3. **Review & Save:** Rhema will automatically parse the file, extract the title, format the lyrics into proper slides, and load it straight into the Editor. Simply click **"Import & Save"** to add it to your library!

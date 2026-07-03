@@ -2,6 +2,9 @@ import { useState, useMemo, useEffect } from "react"
 import { useBroadcastStore } from "@/stores"
 import { splitSongIntoSlides, autoFormatLyrics } from "@/lib/lyrics-utils"
 import { searchItunes, getLyricsExact, type ItunesResult } from "@/lib/lrclib-api"
+import { open } from "@tauri-apps/plugin-dialog"
+import { readTextFile } from "@tauri-apps/plugin-fs"
+import { parseTxt, parsePro6, parseOpenLyrics } from "@/lib/song-parser"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,6 +23,7 @@ import {
   LibraryIcon,
   Loader2Icon,
   Wand2Icon,
+  UploadIcon,
 } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -88,6 +92,40 @@ export function LyricsPanel() {
     setFormTitle(song.title)
     setFormAuthor(song.author || "")
     setFormContent(song.content)
+  }
+
+  const handleImportFile = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Song Files',
+          extensions: ['txt', 'pro6', 'xml']
+        }]
+      })
+      
+      if (selected && typeof selected === 'string') {
+        const content = await readTextFile(selected)
+        const filename = selected.split(/[\/\\]/).pop() || ""
+        const ext = filename.split('.').pop()?.toLowerCase()
+        
+        let parsed = null
+        if (ext === 'txt') parsed = parseTxt(filename, content)
+        else if (ext === 'pro6') parsed = parsePro6(content)
+        else if (ext === 'xml') parsed = parseOpenLyrics(content)
+        
+        if (parsed) {
+          setEditingSongId("new")
+          setSelectedSongId(null)
+          setSelectedOnlineResult(null)
+          setFormTitle(parsed.title)
+          setFormAuthor(parsed.artist)
+          setFormContent(parsed.formContent)
+        }
+      }
+    } catch (err) {
+      console.error("Failed to import file:", err)
+    }
   }
 
   const handleSave = () => {
@@ -170,10 +208,16 @@ export function LyricsPanel() {
             <MusicIcon className="size-5 text-emerald-500" />
             Songs
           </h2>
-          <Button size="sm" onClick={handleCreateNew} className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700">
-            <PlusIcon className="size-4" />
-            Add New
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleImportFile} className="h-8 gap-1.5">
+              <UploadIcon className="size-4" />
+              Import
+            </Button>
+            <Button size="sm" onClick={handleCreateNew} className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+              <PlusIcon className="size-4" />
+              Add New
+            </Button>
+          </div>
         </div>
         
         <div className="flex bg-muted/50 p-1 rounded-lg">
