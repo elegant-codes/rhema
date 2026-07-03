@@ -1,3 +1,5 @@
+import type { Verse } from "./bible"
+
 export interface VerseSegment {
   verseNumber?: number
   text: string
@@ -6,6 +8,8 @@ export interface VerseSegment {
 export interface VerseRenderData {
   reference: string
   segments: VerseSegment[]
+  rawVerses?: Verse[]
+  translationId?: number
 }
 
 export interface RenderOptions {

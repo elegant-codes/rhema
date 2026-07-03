@@ -1,8 +1,12 @@
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
+import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useBroadcastStore } from "@/stores"
+import { useBroadcastStore, useBibleStore } from "@/stores"
+import { bibleActions } from "@/hooks/use-bible"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -49,6 +53,37 @@ export function LiveOutputPanel() {
     }
   }
 
+  const isBibleVerseActive = isLive && activeSongId === null && liveVerse?.rawVerses && liveVerse.rawVerses.length > 0
+  
+  const handleNavigateVerse = async (direction: -1 | 1) => {
+    if (!liveVerse?.rawVerses || !liveVerse.translationId) return
+    const targetVerseNumber = direction === 1
+      ? liveVerse.rawVerses[liveVerse.rawVerses.length - 1].verse + 1
+      : liveVerse.rawVerses[0].verse - 1
+
+    const currentFirstVerse = liveVerse.rawVerses[0]
+    const chapterVerses = await bibleActions.loadChapter(currentFirstVerse.book_number, currentFirstVerse.chapter, liveVerse.translationId)
+    const targetVerse = chapterVerses.find((v) => v.verse === targetVerseNumber)
+    
+    if (targetVerse) {
+      bibleActions.selectVerses([targetVerse])
+      
+      const bibleStore = useBibleStore.getState()
+      const translation = bibleStore.translations.find((t) => t.id === liveVerse.translationId)?.abbreviation ?? "KJV"
+      const newRenderData = toVerseRenderData([targetVerse], translation)
+      useBroadcastStore.getState().setLiveVerse(newRenderData)
+      
+      import("@/stores").then(({ useHistoryStore }) => {
+        useHistoryStore.getState().addItem([targetVerse], liveVerse.translationId!)
+      })
+      
+      // Auto-scroll the preview panel if possible
+      document
+        .getElementById(`verse-${targetVerse.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+  }
+
   return (
     <div
       data-slot="live-output-panel"
@@ -58,23 +93,47 @@ export function LiveOutputPanel() {
       )}
     >
       <PanelHeader title="Live display">
-        <label className="flex items-center gap-2">
-          <span
-            className={cn(
-              "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
-              isLive ? "text-emerald-400" : "text-muted-foreground"
-            )}
-          >
-            {isLive ? "Live" : "Go live"}
-          </span>
-          <Switch
-            checked={isLive}
-            onCheckedChange={(checked) =>
-              useBroadcastStore.getState().setLive(checked)
-            }
-            className="data-[state=checked]:bg-emerald-500"
-          />
-        </label>
+        <div className="flex items-center gap-4">
+          {isBibleVerseActive && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-6 h-6 w-6 rounded-md"
+                onClick={() => handleNavigateVerse(-1)}
+                title="Previous Verse"
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-6 h-6 w-6 rounded-md"
+                onClick={() => handleNavigateVerse(1)}
+                title="Next Verse"
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          )}
+          <label className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-[0.625rem] font-medium uppercase tracking-wider transition-colors",
+                isLive ? "text-emerald-400" : "text-muted-foreground"
+              )}
+            >
+              {isLive ? "Live" : "Go live"}
+            </span>
+            <Switch
+              checked={isLive}
+              onCheckedChange={(checked) =>
+                useBroadcastStore.getState().setLive(checked)
+              }
+              className="data-[state=checked]:bg-emerald-500"
+            />
+          </label>
+        </div>
       </PanelHeader>
 
       <div

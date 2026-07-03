@@ -75,6 +75,8 @@ export function toVerseRenderData(verses: Verse[], translation: string): VerseRe
   return {
     reference,
     segments,
+    rawVerses: sortedVerses,
+    translationId: verses[0]?.translation_id,
   }
 }
 
