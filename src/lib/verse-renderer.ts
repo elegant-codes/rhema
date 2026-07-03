@@ -125,6 +125,7 @@ export function wrapTokens(
       if (paragraph.trim() === "" && paragraphs.length > 1) {
         // preserve empty lines from manual breaks
         if (currentLine.length > 0) pushLine()
+        lines.push({ chunks: [], width: 0 })
         continue
       }
       
@@ -934,8 +935,8 @@ function calculateScaledFontSize(
     // If I use this font size, how tall will the verse be?
     const metrics = measureVerseHeight(ctx, testTheme, verse, textRectWidth)
 
-    // Check if the rendered verse is still too big to fit
-    if (metrics.height <= maxHeight) {
+    // Check if the rendered verse is still too big to fit (both height and width)
+    if (metrics.height <= maxHeight && metrics.maxLineWidth <= textRectWidth) {
       // Increase the font size
       bestFit = mid
       low = mid + 1
@@ -1017,7 +1018,7 @@ function renderVerseImpl(
       ctx,
       scaledTheme,
       verse,
-      metrics.textAreaRect.width,
+      metrics.textRect.width,
       maxAvailableVerseHeight
     )
 
