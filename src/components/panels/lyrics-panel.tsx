@@ -240,7 +240,7 @@ export function LyricsPanel() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground">Content (Split slides with double enter)</label>
+                  <label className="text-[10px] uppercase font-bold text-muted-foreground">Content (Use [Chorus] or Verse 1: to label slides. Split slides with double enter)</label>
                   <Textarea 
                     value={formContent} 
                     onChange={(e) => setFormContent(e.target.value)} 
@@ -262,9 +262,25 @@ export function LyricsPanel() {
                     <p className="text-xs text-muted-foreground truncate">{selectedSong.author || "Unknown Author"}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => handleEdit(selectedSong)}>
-                  <Edit2Icon className="size-3.5 mr-1.5" /> Edit
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => {
+                    import("@/stores").then(({ useQueueStore }) => {
+                      useQueueStore.getState().addItem({
+                        id: crypto.randomUUID(),
+                        type: "song",
+                        songId: selectedSong.id,
+                        reference: selectedSong.title,
+                        source: "manual",
+                        added_at: Date.now(),
+                      })
+                    })
+                  }}>
+                    <PlusIcon className="size-3.5 mr-1.5" /> Queue
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(selectedSong)}>
+                    <Edit2Icon className="size-3.5 mr-1.5" /> Edit
+                  </Button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
@@ -273,7 +289,7 @@ export function LyricsPanel() {
                     const isLive = activeSongId === selectedSong.id && activeSlideIndex === index
                     return (
                       <button
-                        key={index}
+                        key={slide.id || index}
                         onClick={() => handleSelectSlide(index)}
                         className={cn(
                           "relative flex flex-col p-4 rounded-lg border text-left transition-all group",
@@ -288,8 +304,13 @@ export function LyricsPanel() {
                             <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                           )}
                         </div>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap mt-2 line-clamp-4">
-                          {slide}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                            {slide.label || `Slide ${index + 1}`}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap mt-1 line-clamp-4">
+                          {slide.text}
                         </p>
                         <div className={cn(
                           "mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase transition-colors",

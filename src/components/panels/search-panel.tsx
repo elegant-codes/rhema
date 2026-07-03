@@ -89,13 +89,13 @@ export function SearchPanel() {
     activeTranslationId,
     selectedVerses,
   } = useBible()
-
   const queueItems = useQueueStore((s) => s.items)
   const queuedVerseKeys = useMemo(() => {
     return new Set(
       queueItems.flatMap((item) => {
+        if (item.type !== "verse") return []
         const verses = item.verses || (item.verse ? [item.verse] : [])
-        return verses.map((v) => `${v.book_number}:${v.chapter}:${v.verse}`)
+        return verses.map((v: any) => `${v.book_number}:${v.chapter}:${v.verse}`)
       })
     )
   }, [queueItems])
@@ -716,6 +716,7 @@ export function SearchPanel() {
 
                               useQueueStore.getState().addItem({
                                 id: crypto.randomUUID(),
+                                type: "verse",
                                 verses: versesToAdd,
                                 reference,
                                 confidence: 1,
@@ -838,6 +839,7 @@ export function SearchPanel() {
                             e.stopPropagation()
                             useQueueStore.getState().addItem({
                               id: crypto.randomUUID(),
+                              type: "verse",
                               verses: [{
                                 id: 0,
                                 translation_id: activeTranslationId,

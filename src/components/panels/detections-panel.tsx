@@ -84,6 +84,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           onClick={() => {
             useQueueStore.getState().addItem({
               id: crypto.randomUUID(),
+              type: "verse",
               verses: [{
                 id: 0,
                 translation_id: useBibleStore.getState().activeTranslationId,

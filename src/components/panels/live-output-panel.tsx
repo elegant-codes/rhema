@@ -48,7 +48,7 @@ export function LiveOutputPanel() {
     if (slide) {
       verseData = {
         reference: song?.title || "",
-        segments: [{ text: slide, verseNumber: 0 }],
+        segments: [{ text: slide.text, verseNumber: 0 }],
       }
     }
   }

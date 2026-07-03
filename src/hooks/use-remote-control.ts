@@ -157,11 +157,16 @@ async function presentQueueItem(index: number) {
     const item = items[index]
     if (!item) return
 
+    if (item.type === "song") {
+      useBroadcastStore.getState().setLiveSongSlide(item.songId, 0)
+      return
+    }
+
     const verses = item.verses || (item.verse ? [item.verse] : [])
     
     // Fetch the full verse from the backend to ensure we have complete data
     // (AI-detected queue items may have partial verse objects)
-    const fullVerses = await Promise.all(verses.map(async (v) => {
+    const fullVerses = await Promise.all(verses.map(async (v: any) => {
       const full = await invoke<Verse | null>("get_verse", {
         translationId: useBibleStore.getState().activeTranslationId,
         bookNumber: v.book_number,

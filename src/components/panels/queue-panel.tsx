@@ -8,6 +8,7 @@ import {
   GripVerticalIcon,
   HistoryIcon,
   ListIcon,
+  MusicIcon,
 } from "lucide-react"
 import { useQueueStore, useBroadcastStore, useBibleStore, useHistoryStore } from "@/stores"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
@@ -27,15 +28,19 @@ function QueueItemRow({
   isHighlighted: boolean
 }) {
   const handlePresent = () => {
-    const verses = item.verses || (item.verse ? [item.verse] : [])
     useQueueStore.getState().setActive(index)
-    bibleActions.selectVerses(verses)
-    const translationId = useBibleStore.getState().activeTranslationId
-    const translation = useBibleStore.getState().translations
-      .find(t => t.id === translationId)?.abbreviation ?? "KJV"
-    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verses, translation))
-    useBroadcastStore.getState().setLive(true)
-    useHistoryStore.getState().addItem(verses, translationId)
+    if (item.type === "song") {
+      useBroadcastStore.getState().setLiveSongSlide(item.songId, 0)
+    } else {
+      const verses = item.verses || (item.verse ? [item.verse] : [])
+      bibleActions.selectVerses(verses)
+      const translationId = useBibleStore.getState().activeTranslationId
+      const translation = useBibleStore.getState().translations
+        .find(t => t.id === translationId)?.abbreviation ?? "KJV"
+      useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verses, translation))
+      useBroadcastStore.getState().setLive(true)
+      useHistoryStore.getState().addItem(verses, translationId)
+    }
   }
 
   const handleRemove = () => {
@@ -72,6 +77,9 @@ function QueueItemRow({
         className="size-3 shrink-0 text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100"
       />
 
+      {item.type === "song" && (
+        <MusicIcon className="size-3 text-muted-foreground mr-1" />
+      )}
       <span className="flex-1 truncate text-sm font-medium text-foreground">
         {item.reference}
       </span>

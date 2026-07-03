@@ -214,7 +214,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
         if (slide) {
           content = {
             reference: song?.title || "",
-            segments: [{ text: slide }],
+            segments: [{ text: slide.text }],
           }
         }
       } else {

@@ -157,6 +157,7 @@ export function TranscriptPanel() {
         const dupIdx = d.is_chapter_only
           ? queue.items.findIndex(
               (i) => {
+                if (i.type !== "verse") return false
                 const verses = i.verses || (i.verse ? [i.verse] : [])
                 return verses.length > 0 && verses[0].book_number === d.book_number && verses[0].chapter === d.chapter
               }
@@ -170,6 +171,7 @@ export function TranscriptPanel() {
         }
         queue.addItem({
           id: crypto.randomUUID(),
+          type: "verse",
           verses: [{
             id: 0,
             translation_id: 1,

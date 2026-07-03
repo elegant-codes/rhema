@@ -30,11 +30,17 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   addItem: (item) =>
     set((state) => {
       const duplicate = state.items.some((i) => {
-        const itemVerses = item.verses || (item.verse ? [item.verse] : [])
-        const iVerses = i.verses || (i.verse ? [i.verse] : [])
-        
-        return iVerses.length === itemVerses.length && 
-               iVerses.every((v, idx) => v.id === itemVerses[idx].id)
+        if (i.type === "song" && item.type === "song") {
+          return i.songId === item.songId
+        }
+        if (i.type === "verse" && item.type === "verse") {
+          const itemVerses = item.verses || (item.verse ? [item.verse] : [])
+          const iVerses = i.verses || (i.verse ? [i.verse] : [])
+          
+          return iVerses.length === itemVerses.length && 
+                 iVerses.every((v, idx) => v.id === itemVerses[idx].id)
+        }
+        return false
       })
       if (duplicate) return state
       return { items: [item, ...state.items] }
@@ -59,6 +65,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   },
   findDuplicate: (bookNumber, chapter, verse) =>
     get().items.findIndex((i) => {
+      if (i.type !== "verse") return false
       const iVerses = i.verses || (i.verse ? [i.verse] : [])
       return iVerses.length === 1 &&
              iVerses[0].book_number === bookNumber &&
@@ -70,6 +77,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     set((state) => {
       // First try exact match: same book + same chapter
       let idx = state.items.findIndex((i) => {
+        if (i.type !== "verse") return false
         const iVerses = i.verses || (i.verse ? [i.verse] : [])
         return (
           i.is_chapter_only &&
@@ -81,6 +89,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       // Fallback: same book, any chapter (book-only detection guessed chapter 1)
       if (idx === -1) {
         idx = state.items.findIndex((i) => {
+          if (i.type !== "verse") return false
           const iVerses = i.verses || (i.verse ? [i.verse] : [])
           return (
             i.is_chapter_only &&
@@ -92,6 +101,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       if (idx === -1) return state
       const items = [...state.items]
       const item = { ...items[idx] }
+      if (item.type !== "verse") return state
       const itemVerses = item.verses || (item.verse ? [item.verse] : [])
       if (itemVerses.length === 1 && itemVerses[0].book_number === bookNumber && itemVerses[0].chapter === chapter && item.is_chapter_only) {
         // Update the verse in place

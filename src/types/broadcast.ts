@@ -115,12 +115,18 @@ export interface BroadcastTheme {
     direction: "up" | "down" | "left" | "right"
   }
 }
+export interface SongSlide {
+  id: string
+  label: string
+  text: string
+}
+
 export interface Song {
   id: string
   title: string
   author?: string
   content: string
-  slides: string[]
+  slides: SongSlide[]
   createdAt: number
   updatedAt: number
 }
