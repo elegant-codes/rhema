@@ -7,8 +7,11 @@ import { cn } from "@/lib/utils"
 import { useBroadcastStore, useBibleStore } from "@/stores"
 import { bibleActions } from "@/hooks/use-bible"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { useLyricsHotkeys } from "@/hooks/use-lyrics-hotkeys"
 
 export function LiveOutputPanel() {
+  useLyricsHotkeys()
+  
   const isLive = useBroadcastStore((s) => s.isLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)

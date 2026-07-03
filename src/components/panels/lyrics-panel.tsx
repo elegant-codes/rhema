@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useBroadcastStore } from "@/stores"
-import { splitSongIntoSlides } from "@/lib/lyrics-utils"
+import { splitSongIntoSlides, autoFormatLyrics } from "@/lib/lyrics-utils"
+import { searchItunes, getLyricsExact, type ItunesResult } from "@/lib/lrclib-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,7 +15,11 @@ import {
   ChevronLeftIcon,
   MusicIcon,
   XIcon,
-  CheckIcon
+  CheckIcon,
+  GlobeIcon,
+  LibraryIcon,
+  Loader2Icon,
+  Wand2Icon,
 } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -37,6 +42,27 @@ export function LyricsPanel() {
   const [formTitle, setFormTitle] = useState("")
   const [formAuthor, setFormAuthor] = useState("")
   const [formContent, setFormContent] = useState("")
+
+  // Online Search State
+  const [activeTab, setActiveTab] = useState<"library" | "online">("library")
+  const [onlineResults, setOnlineResults] = useState<ItunesResult[]>([])
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false)
+  const [selectedOnlineResult, setSelectedOnlineResult] = useState<ItunesResult | null>(null)
+  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === "online" && searchQuery.trim().length > 2) {
+      const timer = setTimeout(() => {
+        setIsSearchingOnline(true)
+        searchItunes(searchQuery)
+          .then(setOnlineResults)
+          .finally(() => setIsSearchingOnline(false))
+      }, 150)
+      return () => clearTimeout(timer)
+    } else if (activeTab === "online") {
+      setOnlineResults([])
+    }
+  }, [activeTab, searchQuery])
 
   const filteredSongs = useMemo(() => {
     return songs.filter(s => 
@@ -73,6 +99,11 @@ export function LyricsPanel() {
         content: formContent,
         slides,
       })
+      if (activeTab === "online") {
+        setActiveTab("library")
+        setSearchQuery("")
+        setSelectedOnlineResult(null)
+      }
     } else if (editingSongId) {
       updateSong(editingSongId, {
         title: formTitle,
@@ -137,17 +168,41 @@ export function LyricsPanel() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <MusicIcon className="size-5 text-emerald-500" />
-            Lyrics Library
+            Songs
           </h2>
           <Button size="sm" onClick={handleCreateNew} className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700">
             <PlusIcon className="size-4" />
             Add New
           </Button>
         </div>
+        
+        <div className="flex bg-muted/50 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab("library")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all",
+              activeTab === "library" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <LibraryIcon className="size-3.5" />
+            My Library
+          </button>
+          <button
+            onClick={() => setActiveTab("online")}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all",
+              activeTab === "online" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <GlobeIcon className="size-3.5" />
+            Search Online
+          </button>
+        </div>
+
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input 
-            placeholder="Search songs..." 
+            placeholder={activeTab === "online" ? "Search millions of songs online..." : "Search my library..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 h-9 bg-background/50"
@@ -159,57 +214,107 @@ export function LyricsPanel() {
         {/* Left List */}
         <div className={cn(
           "w-full md:w-64 border-r border-border overflow-y-auto shrink-0 transition-all",
-          (selectedSongId || editingSongId) && "hidden md:block"
+          (selectedSongId || editingSongId || selectedOnlineResult) && "hidden md:block"
         )}>
-          {filteredSongs.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <p className="text-sm">No songs found</p>
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {filteredSongs.map((song) => (
-                <button
-                  key={song.id}
-                  onClick={() => {
-                    setSelectedSongId(song.id)
-                    setEditingSongId(null)
-                  }}
-                  className={cn(
-                    "flex flex-col gap-0.5 p-3 text-left transition-colors border-b border-border/50 group",
-                    selectedSongId === song.id ? "bg-emerald-500/10" : "hover:bg-muted/50"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm truncate">{song.title}</span>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="size-6"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEdit(song)
-                        }}
-                      >
-                        <Edit2Icon className="size-3" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="size-6 text-destructive"
-                        onClick={(e) => handleDelete(song.id, e)}
-                      >
-                        <Trash2Icon className="size-3" />
-                      </Button>
+          {activeTab === "library" ? (
+            filteredSongs.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <p className="text-sm">No songs found in library</p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {filteredSongs.map((song) => (
+                  <button
+                    key={song.id}
+                    onClick={() => {
+                      setSelectedSongId(song.id)
+                      setEditingSongId(null)
+                      setSelectedOnlineResult(null)
+                    }}
+                    className={cn(
+                      "flex flex-col gap-0.5 p-3 text-left transition-colors border-b border-border/50 group",
+                      selectedSongId === song.id ? "bg-emerald-500/10" : "hover:bg-muted/50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm truncate">{song.title}</span>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="size-6"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(song)
+                          }}
+                        >
+                          <Edit2Icon className="size-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="size-6 text-destructive"
+                          onClick={(e) => handleDelete(song.id, e)}
+                        >
+                          <Trash2Icon className="size-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  {song.author && (
-                    <span className="text-xs text-muted-foreground truncate">{song.author}</span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground/60">{song.slides.length} slides</span>
-                </button>
-              ))}
-            </div>
+                    {song.author && (
+                      <span className="text-xs text-muted-foreground truncate">{song.author}</span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground/60">{song.slides.length} slides</span>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            isSearchingOnline ? (
+              <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Loader2Icon className="size-5 animate-spin mx-auto" />
+                <p className="text-sm">Searching iTunes...</p>
+              </div>
+            ) : onlineResults.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <p className="text-sm">{searchQuery.length > 2 ? "No results found online" : "Type to search online"}</p>
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                {onlineResults.map((res) => (
+                  <button
+                    key={res.trackId}
+                    onClick={async () => {
+                      setSelectedOnlineResult(res)
+                      setSelectedSongId(null)
+                      setEditingSongId("new")
+                      setFormTitle(res.trackName)
+                      setFormAuthor(res.artistName)
+                      setFormContent("")
+                      
+                      setIsFetchingLyrics(true)
+                      try {
+                        const lyricsResult = await getLyricsExact(res.artistName, res.trackName)
+                        if (lyricsResult?.plainLyrics) {
+                          setFormContent(lyricsResult.plainLyrics)
+                        } else {
+                          // No lyrics found, but title/artist are set
+                          setFormContent("")
+                        }
+                      } finally {
+                        setIsFetchingLyrics(false)
+                      }
+                    }}
+                    className={cn(
+                      "flex flex-col gap-0.5 p-3 text-left transition-colors border-b border-border/50",
+                      selectedOnlineResult?.trackId === res.trackId ? "bg-emerald-500/10" : "hover:bg-muted/50"
+                    )}
+                  >
+                    <span className="font-medium text-sm truncate">{res.trackName}</span>
+                    <span className="text-xs text-muted-foreground truncate">{res.artistName}</span>
+                  </button>
+                ))}
+              </div>
+            )
           )}
         </div>
 
@@ -224,7 +329,7 @@ export function LyricsPanel() {
                     <XIcon className="size-4 mr-1.5" /> Cancel
                   </Button>
                   <Button size="sm" onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700">
-                    <CheckIcon className="size-4 mr-1.5" /> Save
+                    <CheckIcon className="size-4 mr-1.5" /> {activeTab === "online" ? "Import & Save" : "Save"}
                   </Button>
                 </div>
               </div>
@@ -240,12 +345,27 @@ export function LyricsPanel() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground">Content (Use [Chorus] or Verse 1: to label slides. Split slides with double enter)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-2">
+                      Content (Use [Chorus] or Verse 1: to label slides)
+                      {isFetchingLyrics && <Loader2Icon className="size-3 animate-spin text-emerald-500" />}
+                    </label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-[10px] gap-1 px-2"
+                      onClick={() => setFormContent(autoFormatLyrics(formContent))}
+                    >
+                      <Wand2Icon className="size-3" />
+                      Auto-Format
+                    </Button>
+                  </div>
                   <Textarea 
                     value={formContent} 
                     onChange={(e) => setFormContent(e.target.value)} 
-                    placeholder="Enter lyrics here..."
+                    placeholder={isFetchingLyrics ? "Fetching exact lyrics from LRCLIB..." : "Enter lyrics here..."}
                     className="flex-1 min-h-[300px] font-mono text-sm leading-relaxed"
+                    disabled={isFetchingLyrics}
                   />
                 </div>
               </div>
