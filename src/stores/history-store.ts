@@ -14,7 +14,7 @@ interface HistoryState {
   clearHistory: () => void
 }
 
-export const useHistoryStore = create<HistoryState>((set, get) => ({
+export const useHistoryStore = create<HistoryState>((set) => ({
   items: [],
   addItem: (verse, translationId) =>
     set((state) => {

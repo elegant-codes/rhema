@@ -1,10 +1,8 @@
-import { useEffect } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { useBroadcastStore, useBibleStore } from "@/stores"
-import { deriveLiveVerse } from "@/hooks/use-broadcast"
+import { useBroadcastStore } from "@/stores"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)

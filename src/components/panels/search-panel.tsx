@@ -245,7 +245,7 @@ export function SearchPanel() {
   const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contextSearchRequestIdRef = useRef(0)
 
-  const runContextSearch = useCallback(async (query: string, translationId: number) => {
+  const runContextSearch = useCallback(async (query: string) => {
     const requestId = ++contextSearchRequestIdRef.current
     const isStale = () => requestId !== contextSearchRequestIdRef.current
 
@@ -263,9 +263,8 @@ export function SearchPanel() {
     setContextQuery(query)
     if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
     if (query.length >= 5) {
-      const translationId = useBibleStore.getState().activeTranslationId
       contextDebounceRef.current = setTimeout(() => {
-        runContextSearch(query, translationId).catch(console.error)
+        runContextSearch(query).catch(console.error)
       }, 280)
     } else {
       contextSearchRequestIdRef.current += 1
@@ -277,8 +276,8 @@ export function SearchPanel() {
     if (activeTab !== "context" || contextQuery.length < 5) return
     if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
     contextDebounceRef.current = setTimeout(() => {
-      runContextSearch(contextQuery, activeTranslationId).catch(console.error)
-    }, 120)
+      runContextSearch(contextQuery).catch(console.error)
+    }, 280)
   }, [activeTranslationId, activeTab, contextQuery, runContextSearch])
 
   useEffect(() => {
