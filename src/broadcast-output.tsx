@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client"
 import { useRef, useEffect, useCallback } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { renderVerse } from "@/lib/verse-renderer"
+import { renderVerse, renderAlert } from "@/lib/verse-renderer"
 import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
 import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
 
@@ -27,6 +27,7 @@ const OUTPUT_ID = new URLSearchParams(window.location.search).get("output") ?? "
 interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
+  alert?: string | null
 }
 
 function BroadcastCanvas() {
@@ -53,7 +54,7 @@ function BroadcastCanvas() {
     console.debug(`[broadcast-output] ${message}`, meta)
   }, [])
 
-  const draw = useCallback(() => {
+  const draw = useCallback((now: number = performance.now()) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext("2d")
@@ -67,7 +68,7 @@ function BroadcastCanvas() {
       return
     }
 
-    const { theme, verse } = data
+    const { theme, verse, alert } = data
     canvas.width = theme.resolution.width
     canvas.height = theme.resolution.height
     const result = renderVerse(ctx, theme, verse, {
@@ -78,6 +79,11 @@ function BroadcastCanvas() {
       ctx.fillStyle = "#000"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       logDebug("renderVerse returned null; drew fallback frame")
+    }
+
+    if (alert) {
+      renderAlert(ctx, canvas.width, canvas.height, alert, now)
+      requestAnimationFrame(() => draw(performance.now()))
     }
   }, [logDebug])
 
@@ -288,7 +294,8 @@ function BroadcastCanvas() {
     const loop = (time: number) => {
       animationFrameId = requestAnimationFrame(loop);
       
-      if (!isVideoPlayingRef.current) return;
+      const isAlertActive = !!latestData.current?.alert;
+      if (!isVideoPlayingRef.current && !isAlertActive) return;
       
       // Throttle to NDI FPS (fallback to 30)
       const fps = ndiConfigRef.current.fps || 30;
@@ -296,7 +303,7 @@ function BroadcastCanvas() {
       
       if (time - lastTime >= interval) {
         lastTime = time - (time % interval);
-        draw();
+        draw(time);
         if (ndiConfigRef.current.active) {
           void pushNdiFrame();
         }

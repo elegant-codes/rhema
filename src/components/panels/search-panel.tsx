@@ -20,6 +20,7 @@ import {
   PlusIcon,
   ImageIcon,
   MusicIcon,
+  BellRingIcon,
 } from "lucide-react"
 import {
   Tooltip,
@@ -34,8 +35,9 @@ import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import { ImageLibraryPanel } from "./image-library-panel"
 import { LyricsPanel } from "./lyrics-panel"
+import { AlertsPanel } from "./alerts-panel"
 
-type SearchTab = "book" | "context" | "images" | "lyrics"
+type SearchTab = "book" | "context" | "images" | "lyrics" | "alerts"
 
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -486,6 +488,18 @@ export function SearchPanel() {
             <MusicIcon className={cn("size-3.5", activeTab === "lyrics" ? "text-lime-400" : "text-muted-foreground")} />
             Lyrics
           </button>
+          <button
+            onClick={() => setActiveTab("alerts")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "alerts"
+                ? "border-amber-500/50 bg-amber-500/15"
+                : "border-border bg-background text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BellRingIcon className={cn("size-3.5", activeTab === "alerts" ? "text-amber-400" : "text-muted-foreground")} />
+            Alerts
+          </button>
         </div>
 
         {activeTab === "book" ? (
@@ -878,6 +892,11 @@ export function SearchPanel() {
       {/* Lyrics tab */}
       {activeTab === "lyrics" && (
         <LyricsPanel />
+      )}
+
+      {/* Alerts tab */}
+      {activeTab === "alerts" && (
+        <AlertsPanel />
       )}
     </div>
   )

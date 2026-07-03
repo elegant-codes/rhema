@@ -130,3 +130,8 @@ export interface Song {
   createdAt: number
   updatedAt: number
 }
+export interface BroadcastPayload {
+  theme: BroadcastTheme
+  verse: VerseRenderData | null
+  alert: string | null
+}

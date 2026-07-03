@@ -18,6 +18,7 @@ export function LiveOutputPanel() {
   const liveImage = useBroadcastStore((s) => s.liveImage)
   const liveImageFit = useBroadcastStore((s) => s.liveImageFit)
   const showVerseOnMedia = useBroadcastStore((s) => s.showVerseOnMedia)
+  const liveAlert = useBroadcastStore((s) => s.liveAlert)
   const songs = useBroadcastStore((s) => s.songs)
   const activeSongId = useBroadcastStore((s) => s.activeSongId)
   const activeSlideIndex = useBroadcastStore((s) => s.activeSlideIndex)
@@ -145,7 +146,7 @@ export function LiveOutputPanel() {
           !isLive && "opacity-40"
         )}
       >
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        <CanvasVerse theme={activeTheme} verse={verseData} alert={liveAlert} />
       </div>
     </div>
   )

@@ -27,6 +27,7 @@ export function PreviewPanel() {
   }, [activeTranslationId])
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const liveAlert = useBroadcastStore((s) => s.liveAlert)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
   const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
@@ -58,7 +59,7 @@ export function PreviewPanel() {
         </Button>
       </PanelHeader>
       <div className="flex min-h-0 flex-1 items-center justify-center p-3">
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        <CanvasVerse theme={activeTheme} verse={verseData} alert={liveAlert} />
       </div>
     </div>
   )

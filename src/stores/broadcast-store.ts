@@ -12,6 +12,7 @@ interface BroadcastState {
   altActiveThemeId: string
   isLive: boolean
   liveVerse: VerseRenderData | null
+  liveAlert: string | null
 
   // Image Library
   imageLibrary: string[]
@@ -43,6 +44,7 @@ interface BroadcastState {
   setAltActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
   setLiveVerse: (verse: VerseRenderData | null) => void
+  setLiveAlert: (text: string | null) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
 
@@ -108,12 +110,14 @@ function emitDraftToBroadcast(state: BroadcastState): void {
     void emitTo("broadcast", "broadcast:verse-update", {
       theme: state.draftTheme,
       verse: state.liveVerse,
+      alert: state.liveAlert,
     }).catch(() => {})
   }
   if (id === state.altActiveThemeId) {
     void emitTo("broadcast-alt", "broadcast:verse-update", {
       theme: state.draftTheme,
       verse: state.liveVerse,
+      alert: state.liveAlert,
     }).catch(() => {})
   }
 }
@@ -124,6 +128,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   altActiveThemeId: BUILTIN_THEMES[0].id,
   isLive: false,
   liveVerse: null,
+  liveAlert: null,
   imageLibrary: [],
   liveImage: null,
   liveImageFit: "cover",
@@ -243,6 +248,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     void emitTo(label, "broadcast:verse-update", {
       theme: activeTheme,
       verse: content,
+      alert: s.liveAlert,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -263,6 +269,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   setLiveVerse: (liveVerse) => {
     set({ liveVerse, activeSongId: null, activeSlideIndex: null })
+    get().syncBroadcastOutput()
+  },
+  setLiveAlert: (text) => {
+    set({ liveAlert: text })
     get().syncBroadcastOutput()
   },
   

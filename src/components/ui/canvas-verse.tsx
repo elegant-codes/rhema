@@ -1,17 +1,19 @@
 import { useRef, useEffect, useState, memo } from "react"
-import { renderVerse } from "@/lib/verse-renderer"
+import { renderVerse, renderAlert } from "@/lib/verse-renderer"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 import { cn } from "@/lib/utils"
 
 interface CanvasVerseProps {
   theme: BroadcastTheme
   verse: VerseRenderData | null
+  alert?: string | null
   className?: string
 }
 
 export const CanvasVerse = memo(function CanvasVerse({
   theme,
   verse,
+  alert,
   className,
 }: CanvasVerseProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -126,9 +128,12 @@ export const CanvasVerse = memo(function CanvasVerse({
     
     let animationFrameId: number;
 
-    const render = () => {
+    const render = (time: number = performance.now()) => {
       renderVerse(ctx, theme, verse, { scale, imageCache })
-      if (isVideoPlaying) {
+      if (alert) {
+        renderAlert(ctx, displayW, displayH, alert, time)
+      }
+      if (isVideoPlaying || alert) {
         animationFrameId = requestAnimationFrame(render)
       }
     }
@@ -138,7 +143,7 @@ export const CanvasVerse = memo(function CanvasVerse({
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
     }
-  }, [theme, verse, containerWidth, imageCache, imageLoaded, isVideoPlaying])
+  }, [theme, verse, alert, containerWidth, imageCache, imageLoaded, isVideoPlaying])
 
   return (
     <div ref={containerRef} className={cn("w-full", className)}>

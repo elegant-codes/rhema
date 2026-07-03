@@ -1046,3 +1046,57 @@ function renderVerseImpl(
   ctx.restore()
   return metrics
 }
+
+export function renderAlert(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  alertText: string,
+  now: number,
+): void {
+  // Scale dynamically based on a 1080p reference height
+  const scale = height / 1080
+  const barHeight = 120 * scale
+  const y = height - barHeight
+
+  // Draw semi-transparent black bar
+  ctx.fillStyle = "rgba(0, 0, 0, 0.85)"
+  ctx.fillRect(0, y, width, barHeight)
+
+  // Setup text
+  const fontSize = 64 * scale
+  ctx.font = `bold ${fontSize}px Inter, sans-serif`
+  ctx.fillStyle = "#fbbf24" // amber-400
+  ctx.textBaseline = "middle"
+
+  // Measure text
+  const textWidth = ctx.measureText(alertText).width
+  
+  // Calculate scrolling position
+  // Speed: e.g., 150 pixels per second on 1080p, scaled
+  const speed = 150 * scale 
+  // We want it to start from the right edge and slide to the left edge.
+  // The total distance to travel is width + textWidth
+  const totalDistance = width + textWidth
+  const duration = (totalDistance / speed) * 1000 // in ms
+  
+  // Modulo the time to loop it
+  const elapsed = now % duration
+  const x = width - (elapsed / 1000) * speed
+
+  // Draw text
+  const textY = y + (barHeight / 2)
+  
+  // Optional: subtle drop shadow for readability
+  ctx.shadowColor = "rgba(0,0,0,0.5)"
+  ctx.shadowBlur = 4 * scale
+  ctx.shadowOffsetX = 2 * scale
+  ctx.shadowOffsetY = 2 * scale
+  
+  // Draw it left-aligned at the calculated x position
+  ctx.textAlign = "left"
+  ctx.fillText(alertText, x, textY)
+  
+  // Reset shadow
+  ctx.shadowColor = "transparent"
+}

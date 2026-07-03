@@ -88,3 +88,10 @@ Migrating from other worship software is easy with Rhema's Universal File Import
 1. **Open the Importer:** In the **Songs** panel, click the new **"Import"** button next to "Add New".
 2. **Select a File:** Choose a `.txt`, `.pro6` (ProPresenter 6), or `.xml` (OpenLyrics) file from your computer.
 3. **Review & Save:** Rhema will automatically parse the file, extract the title, format the lyrics into proper slides, and load it straight into the Editor. Simply click **"Import & Save"** to add it to your library!
+
+### How to use Live Alerts (Nursery Messages)
+Sometimes you need to page a parent or display an announcement without interrupting the active presentation.
+1. **Open the Alerts Panel:** Click the **Bell Icon (Alerts Tab)** located in the main right-hand panel (next to Lyrics and Media).
+2. **Select or Type a Message:** Choose one of the Quick Presets (e.g., "Nursery worker needed") or type your own custom message into the text box.
+3. **Show the Alert:** Press `Enter` or click **Show**. An elegant, high-visibility black bar with bold yellow text will appear at the bottom of the screen. The text will automatically scroll like a continuous ticker!
+4. **Clear the Alert:** When you're done, simply click the red **Clear** button to smoothly remove it from the screen.
