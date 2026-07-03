@@ -69,6 +69,7 @@ export function SearchPanel() {
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState(1)
+  const [hasNextChapter, setHasNextChapter] = useState(true)
   const [lastSelectedVerseId, setLastSelectedVerseId] = useState<number | null>(null)
   const [contextQuery, setContextQuery] = useState("")
 
@@ -116,6 +117,9 @@ export function SearchPanel() {
   useEffect(() => {
     if (selectedBookNumber && chapter >= 1) {
       bibleActions.loadChapter(selectedBookNumber, chapter).catch(console.error)
+      bibleActions.fetchVerse(selectedBookNumber, chapter + 1, 1)
+        .then((v) => setHasNextChapter(!!v))
+        .catch(() => setHasNextChapter(false))
     }
   }, [selectedBookNumber, chapter, activeTranslationId])
 
@@ -629,6 +633,7 @@ export function SearchPanel() {
                   setLastSelectedVerseId(null)
                   bibleActions.selectVerses([])
                 }}
+                disabled={!hasNextChapter}
               >
                 <ArrowRightIcon className="size-3" />
               </Button>
