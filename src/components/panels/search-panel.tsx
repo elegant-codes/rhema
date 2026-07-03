@@ -32,7 +32,6 @@ import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { useBibleStore, useQueueStore, useBroadcastStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
-import { searchContextWithFuse } from "@/lib/context-search"
 import { ImageLibraryPanel } from "./image-library-panel"
 import { LyricsPanel } from "./lyrics-panel"
 
@@ -250,22 +249,14 @@ export function SearchPanel() {
     const requestId = ++contextSearchRequestIdRef.current
     const isStale = () => requestId !== contextSearchRequestIdRef.current
 
-    // Primary: hybrid search backend (combines vector + FTS5 BM25)
+    // Hybrid search backend (combines vector + FTS5 BM25 gracefully)
     const hybridResults = await invoke<SemanticSearchResult[]>(
       "semantic_search", { query, limit: 15 }
-    ).catch(() => null)
+    ).catch(() => [])
 
     if (isStale()) return
 
-    if (hybridResults && hybridResults.length > 0) {
-      useBibleStore.getState().setSemanticResults(hybridResults)
-      return
-    }
-
-    // Fallback: client-side Fuse.js when semantic model is not loaded
-    const fuseResults = await searchContextWithFuse(query, translationId, 15).catch(() => [])
-    if (isStale()) return
-    useBibleStore.getState().setSemanticResults(fuseResults)
+    useBibleStore.getState().setSemanticResults(hybridResults || [])
   }, [])
 
   const handleContextSearch = useCallback((query: string) => {

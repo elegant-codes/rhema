@@ -36,7 +36,6 @@ pub fn run() {
             commands::bible::get_chapter,
             commands::bible::get_verse,
             commands::bible::search_verses,
-            commands::bible::get_translation_verses_for_search,
             commands::bible::get_cross_references,
             commands::bible::get_active_translation,
             commands::bible::set_active_translation,

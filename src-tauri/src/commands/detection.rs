@@ -167,9 +167,10 @@ pub fn semantic_search(
     let vector_results = {
         let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
         if !pipeline.has_semantic() {
-            return Err("Semantic search not available — model or embeddings not loaded".into());
+            vec![]
+        } else {
+            pipeline.semantic_search(&query, k)
         }
-        pipeline.semantic_search(&query, k)
     }; // Pipeline lock dropped
 
     // Lock AppState for DB lookups only (fast)
