@@ -27,14 +27,15 @@ function QueueItemRow({
   isHighlighted: boolean
 }) {
   const handlePresent = () => {
+    const verses = item.verses || (item.verse ? [item.verse] : [])
     useQueueStore.getState().setActive(index)
-    bibleActions.selectVerse(item.verse)
+    bibleActions.selectVerses(verses)
     const translationId = useBibleStore.getState().activeTranslationId
     const translation = useBibleStore.getState().translations
       .find(t => t.id === translationId)?.abbreviation ?? "KJV"
-    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(item.verse, translation))
+    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verses, translation))
     useBroadcastStore.getState().setLive(true)
-    useHistoryStore.getState().addItem(item.verse, translationId)
+    useHistoryStore.getState().addItem(verses, translationId)
   }
 
   const handleRemove = () => {
@@ -92,20 +93,25 @@ function QueueItemRow({
 function HistoryItemRow({ item }: { item: HistoryItem }) {
   const translations = useBibleStore((s) => s.translations)
   const translationAbbrev = translations.find(t => t.id === item.translationId)?.abbreviation ?? "KJV"
-  const reference = `${item.verse.book_name} ${item.verse.chapter}:${item.verse.verse} (${translationAbbrev})`
+  const verses = item.verses || (item.verse ? [item.verse] : [])
+  const reference = verses.length > 1 
+    ? `${verses[0].book_name} ${verses[0].chapter}:${verses[0].verse}-${verses[verses.length-1].verse} (${translationAbbrev})`
+    : verses.length === 1 
+      ? `${verses[0].book_name} ${verses[0].chapter}:${verses[0].verse} (${translationAbbrev})`
+      : `Unknown (${translationAbbrev})`
 
   const handlePreview = () => {
-    bibleActions.selectVerse(item.verse)
+    bibleActions.selectVerses(verses)
   }
 
   const handlePresent = (e: React.MouseEvent) => {
     e.stopPropagation()
-    bibleActions.selectVerse(item.verse)
-    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(item.verse, translationAbbrev))
+    bibleActions.selectVerses(verses)
+    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verses, translationAbbrev))
     useBroadcastStore.getState().setLive(true)
     // No need to add it to history again if it's the exact same item, 
     // but doing so will bump it to the top anyway which is expected behavior.
-    useHistoryStore.getState().addItem(item.verse, item.translationId)
+    useHistoryStore.getState().addItem(verses, item.translationId)
   }
 
   const timeAgo = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })

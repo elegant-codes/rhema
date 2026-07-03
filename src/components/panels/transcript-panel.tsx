@@ -93,7 +93,7 @@ export function TranscriptPanel() {
       if (directHit && directHit.book_number > 0) {
         lastAutoSelectTime.current = now
         // Select verse immediately so preview/live panels update
-        bibleActions.selectVerse({
+        bibleActions.selectVerses([{
           id: 0,
           translation_id: useBibleStore.getState().activeTranslationId,
           book_number: directHit.book_number,
@@ -102,7 +102,7 @@ export function TranscriptPanel() {
           chapter: directHit.chapter,
           verse: directHit.verse,
           text: directHit.verse_text,
-        })
+        }])
         // Navigate book search panel to this verse
         const bibleStore = useBibleStore.getState()
         bibleStore.setPendingNavigation({
@@ -122,7 +122,7 @@ export function TranscriptPanel() {
               })
               useBroadcastStore.getState().setLive(true)
               import("@/stores").then(({ useHistoryStore }) => {
-                useHistoryStore.getState().addItem(actualVerse, bibleStore.activeTranslationId)
+                useHistoryStore.getState().addItem([actualVerse], bibleStore.activeTranslationId)
               })
             }
           })
@@ -156,9 +156,10 @@ export function TranscriptPanel() {
         // previous chapter-only → refinement cycle.
         const dupIdx = d.is_chapter_only
           ? queue.items.findIndex(
-              (i) =>
-                i.verse.book_number === d.book_number &&
-                i.verse.chapter === d.chapter,
+              (i) => {
+                const verses = i.verses || (i.verse ? [i.verse] : [])
+                return verses.length > 0 && verses[0].book_number === d.book_number && verses[0].chapter === d.chapter
+              }
             )
           : queue.findDuplicate(d.book_number, d.chapter, d.verse)
         if (dupIdx !== -1) {
@@ -169,7 +170,7 @@ export function TranscriptPanel() {
         }
         queue.addItem({
           id: crypto.randomUUID(),
-          verse: {
+          verses: [{
             id: 0,
             translation_id: 1,
             book_number: d.book_number,
@@ -178,7 +179,7 @@ export function TranscriptPanel() {
             chapter: d.chapter,
             verse: d.verse,
             text: d.verse_text,
-          },
+          }],
           reference: d.verse_ref,
           confidence: d.confidence,
           source: d.source === "direct" ? "ai-direct" : "ai-semantic",
@@ -194,7 +195,7 @@ export function TranscriptPanel() {
   // Does NOT add to queue — only direct/semantic feed the queue.
   useTauriEvent<ReadingAdvance>("reading_mode_verse", (advance) => {
     if (advance.book_number > 0) {
-      bibleActions.selectVerse({
+      bibleActions.selectVerses([{
         id: 0,
         translation_id: useBibleStore.getState().activeTranslationId,
         book_number: advance.book_number,
@@ -203,7 +204,7 @@ export function TranscriptPanel() {
         chapter: advance.chapter,
         verse: advance.verse,
         text: advance.verse_text,
-      })
+      }])
       useBibleStore.getState().setPendingNavigation({
         bookNumber: advance.book_number,
         chapter: advance.chapter,

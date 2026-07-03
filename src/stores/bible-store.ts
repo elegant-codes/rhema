@@ -16,7 +16,7 @@ interface BibleState {
   books: Book[]
   searchResults: Verse[]
   semanticResults: SemanticSearchResult[]
-  selectedVerse: Verse | null
+  selectedVerses: Verse[]
   currentChapter: Verse[]
   crossReferences: CrossReference[]
   pendingNavigation: PendingNavigation | null
@@ -26,7 +26,7 @@ interface BibleState {
   setBooks: (books: Book[]) => void
   setSearchResults: (results: Verse[]) => void
   setSemanticResults: (results: SemanticSearchResult[]) => void
-  selectVerse: (verse: Verse | null) => void
+  selectVerses: (verses: Verse[]) => void
   setCurrentChapter: (verses: Verse[]) => void
   setCrossReferences: (refs: CrossReference[]) => void
   setPendingNavigation: (nav: PendingNavigation | null) => void
@@ -38,7 +38,7 @@ export const useBibleStore = create<BibleState>((set) => ({
   books: [],
   searchResults: [],
   semanticResults: [],
-  selectedVerse: null,
+  selectedVerses: [],
   currentChapter: [],
   crossReferences: [],
   pendingNavigation: null,
@@ -48,7 +48,7 @@ export const useBibleStore = create<BibleState>((set) => ({
   setBooks: (books) => set({ books }),
   setSearchResults: (searchResults) => set({ searchResults }),
   setSemanticResults: (semanticResults) => set({ semanticResults }),
-  selectVerse: (selectedVerse) => set({ selectedVerse }),
+  selectVerses: (selectedVerses) => set({ selectedVerses }),
   setCurrentChapter: (currentChapter) => set({ currentChapter }),
   setCrossReferences: (crossReferences) => set({ crossReferences }),
   setPendingNavigation: (pendingNavigation) => set({ pendingNavigation }),

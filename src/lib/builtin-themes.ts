@@ -8,7 +8,7 @@ const baseTheme: Omit<BroadcastTheme, "id" | "name" | "background" | "verseText"
   resolution: { width: 1920, height: 1080 },
   verseNumbers: {
     visible: true,
-    fontSize: 14,
+    fontSize: 36,
     color: "#ffffff",
     superscript: true,
   },
@@ -54,7 +54,7 @@ const CLASSIC_DARK: BroadcastTheme = {
   },
   verseNumbers: {
     visible: true,
-    fontSize: 20,
+    fontSize: 42,
     color: "#d4a574",
     superscript: true,
   },
@@ -124,7 +124,7 @@ const MODERN_LIGHT: BroadcastTheme = {
   },
   verseNumbers: {
     visible: true,
-    fontSize: 18,
+    fontSize: 40,
     color: "#666666",
     superscript: true,
   },
@@ -194,7 +194,7 @@ const BROADCAST_OVERLAY: BroadcastTheme = {
   },
   verseNumbers: {
     visible: true,
-    fontSize: 18,
+    fontSize: 36,
     color: "#fbbf24",
     superscript: true,
   },

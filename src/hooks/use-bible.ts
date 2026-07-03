@@ -100,8 +100,8 @@ export const bibleActions = {
     useBibleStore
       .getState()
       .setPendingNavigation({ bookNumber, chapter, verse }),
-  selectVerse: (verse: Verse | null) =>
-    useBibleStore.getState().selectVerse(verse),
+  selectVerses: (verses: Verse[]) =>
+    useBibleStore.getState().selectVerses(verses),
 }
 
 // Hook for components that need reactive store data
@@ -112,7 +112,7 @@ export function useBible() {
   const currentChapter = useBibleStore((s) => s.currentChapter)
   const searchResults = useBibleStore((s) => s.searchResults)
   const semanticResults = useBibleStore((s) => s.semanticResults)
-  const selectedVerse = useBibleStore((s) => s.selectedVerse)
+  const selectedVerses = useBibleStore((s) => s.selectedVerses)
   const crossReferences = useBibleStore((s) => s.crossReferences)
 
   return {
@@ -122,7 +122,7 @@ export function useBible() {
     currentChapter,
     searchResults,
     semanticResults,
-    selectedVerse,
+    selectedVerses,
     crossReferences,
     ...bibleActions,
   }

@@ -57,6 +57,118 @@ export function wrapText(
   return allLines
 }
 
+export interface TextChunk {
+  text: string
+  isVerseNum: boolean
+  width: number
+}
+
+export interface TextLine {
+  chunks: TextChunk[]
+  width: number
+}
+
+export function wrapTokens(
+  ctx: CanvasRenderingContext2D,
+  theme: BroadcastTheme,
+  verse: VerseRenderData,
+  maxWidth: number
+): TextLine[] {
+  const vt = theme.verseText
+  const vn = theme.verseNumbers
+  const showNumbers = vn.visible && verse.segments.length > 1
+  
+  const textFont = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
+  const numFont = `${vt.fontWeight} ${vn.fontSize}px "${vt.fontFamily}", serif`
+
+  const lines: TextLine[] = []
+  let currentLine: TextChunk[] = []
+  
+  const pushLine = () => {
+    ctx.font = textFont
+    const spaceWidth = ctx.measureText(" ").width
+    let width = 0
+    for (let i = 0; i < currentLine.length; i++) {
+      width += currentLine[i].width + (i < currentLine.length - 1 ? spaceWidth : 0)
+    }
+    lines.push({ chunks: currentLine, width })
+    currentLine = []
+  }
+
+  for (const segment of verse.segments) {
+    if (showNumbers && segment.verseNumber !== undefined) {
+      ctx.font = numFont
+      const numStr = `${segment.verseNumber}`
+      const numWidth = ctx.measureText(numStr).width
+      ctx.font = textFont
+      const spaceWidth = ctx.measureText(" ").width
+      
+      const lineWidthSoFar = currentLine.reduce((acc, c) => acc + c.width, 0) + Math.max(0, currentLine.length - 1) * spaceWidth
+      
+      if (lineWidthSoFar + (currentLine.length > 0 ? spaceWidth : 0) + numWidth > maxWidth && currentLine.length > 0) {
+        pushLine()
+      }
+      currentLine.push({ text: numStr, isVerseNum: true, width: numWidth })
+    }
+
+    ctx.font = textFont
+    const transformedText = applyTextTransform(segment.text, resolveTextTransform(vt.textTransform))
+    const paragraphs = transformedText.split("\n")
+
+    for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+      const paragraph = paragraphs[pIdx]
+      
+      if (pIdx > 0) {
+        pushLine()
+      }
+      
+      if (paragraph.trim() === "" && paragraphs.length > 1) {
+        // preserve empty lines from manual breaks
+        if (currentLine.length > 0) pushLine()
+        continue
+      }
+      
+      const words = paragraph.split(" ")
+      for (const word of words) {
+        if (!word) continue
+        
+        ctx.font = textFont
+        const spaceWidth = ctx.measureText(" ").width
+        
+        const lastChunk = currentLine[currentLine.length - 1]
+        if (lastChunk && !lastChunk.isVerseNum) {
+          const testText = lastChunk.text ? `${lastChunk.text} ${word}` : word
+          const testWidth = ctx.measureText(testText).width
+          const otherChunksWidth = currentLine.slice(0, -1).reduce((acc, c) => acc + c.width, 0) + Math.max(0, currentLine.length - 2) * spaceWidth
+          
+          if (otherChunksWidth + (currentLine.length > 1 ? spaceWidth : 0) + testWidth > maxWidth && lastChunk.text) {
+             pushLine()
+             const wordWidth = ctx.measureText(word).width
+             currentLine.push({ text: word, isVerseNum: false, width: wordWidth })
+          } else {
+             lastChunk.text = testText
+             lastChunk.width = testWidth
+          }
+        } else {
+          const wordWidth = ctx.measureText(word).width
+          const lineWidthSoFar = currentLine.reduce((acc, c) => acc + c.width, 0) + Math.max(0, currentLine.length - 1) * spaceWidth
+          
+          if (lineWidthSoFar + (currentLine.length > 0 ? spaceWidth : 0) + wordWidth > maxWidth && currentLine.length > 0) {
+             pushLine()
+          }
+          currentLine.push({ text: word, isVerseNum: false, width: wordWidth })
+        }
+      }
+    }
+  }
+  
+  if (currentLine.length > 0) {
+    pushLine()
+  }
+  
+  return lines
+}
+
 function alignX(
   textAlign: "left" | "center" | "right",
   rectX: number,
@@ -410,42 +522,40 @@ function drawVerseText(
   const verseAlign = resolveHorizontalAlign(vt.horizontalAlign, theme.layout.textAlign, true)
   const verseDecoration = resolveTextDecoration(vt.textDecoration)
   const actualFontSize = scaledFontSize ?? vt.fontSize
+  const actualNumFontSize = vn.fontSize * (actualFontSize / vt.fontSize)
   const lineHeightPx = actualFontSize * vt.lineHeight
 
   ctx.save()
-  ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
-  ctx.fillStyle = vt.color
   ctx.textBaseline = "top"
-  ctx.textAlign = verseAlign === "justify" ? "left" : verseAlign
 
   if (vt.letterSpacing > 0) {
     try { ctx.letterSpacing = `${vt.letterSpacing}px` } catch { /* unsupported in some WebViews */ }
   }
 
-  // Build full text with verse numbers inline
-  let fullText = ""
-  const showNumbers = vn.visible && verse.segments.length > 1
-  for (const segment of verse.segments) {
-    if (showNumbers && segment.verseNumber !== undefined) {
-      fullText += `${segment.verseNumber} `
-    }
-    fullText += segment.text + " "
+  const scaledTheme = {
+    ...theme,
+    verseText: { ...vt, fontSize: actualFontSize },
+    verseNumbers: { ...vn, fontSize: actualNumFontSize }
   }
-  fullText = applyTextTransform(fullText.trim(), resolveTextTransform(vt.textTransform))
 
-  const wrappedLines = wrapText(ctx, fullText, textRectWidth)
+  const wrappedLines = wrapTokens(ctx, scaledTheme, verse, textRectWidth)
 
   let currentY = startY
-  const x = alignX(verseAlign === "justify" ? "left" : verseAlign, textRectX, textRectWidth)
 
-  const drawStyledLine = (line: string, drawX: number, drawY: number) => {
+  const drawChunk = (chunk: TextChunk, drawX: number, drawY: number) => {
+    const isNum = chunk.isVerseNum
+    ctx.font = `${vt.fontWeight} ${isNum ? actualNumFontSize : actualFontSize}px "${vt.fontFamily}", serif`
+    ctx.fillStyle = isNum ? vn.color : vt.color
+    
+    const finalY = (isNum && vn.superscript) ? drawY - actualFontSize * 0.25 : drawY
+
     if (vt.shadow) {
       ctx.save()
       ctx.shadowColor = vt.shadow.color
       ctx.shadowBlur = vt.shadow.blur
       ctx.shadowOffsetX = vt.shadow.x
       ctx.shadowOffsetY = vt.shadow.y
-      ctx.fillText(line, drawX, drawY)
+      ctx.fillText(chunk.text, drawX, finalY)
       ctx.restore()
     }
 
@@ -453,56 +563,70 @@ function drawVerseText(
       ctx.save()
       ctx.strokeStyle = vt.outline.color
       ctx.lineWidth = vt.outline.width
-      ctx.strokeText(line, drawX, drawY)
+      ctx.strokeText(chunk.text, drawX, finalY)
       ctx.restore()
     }
 
     if (!vt.shadow) {
-      ctx.fillText(line, drawX, drawY)
+      ctx.fillText(chunk.text, drawX, finalY)
     }
   }
 
+  ctx.textAlign = "left"
+
   for (const [index, line] of wrappedLines.entries()) {
-    const isJustifiedLine = verseAlign === "justify" && index < wrappedLines.length - 1 && /\s+/.test(line)
+    const lineText = line.chunks.map(c => c.text).join(" ")
+    const isJustifiedLine = verseAlign === "justify" && index < wrappedLines.length - 1 && /\s+/.test(lineText) && line.width > textRectWidth * 0.75
+    
     if (isJustifiedLine) {
-      const words = line.trim().split(/\s+/).filter(Boolean)
-      if (words.length > 1) {
-        const wordsWidth = words.reduce((sum, word) => sum + ctx.measureText(word).width, 0)
-        const gap = (textRectWidth - wordsWidth) / (words.length - 1)
-        let cursorX = textRectX
-        for (const word of words) {
-          drawStyledLine(word, cursorX, currentY)
-          cursorX += ctx.measureText(word).width + gap
+      let totalSpaces = 0
+      let wordsWidth = 0
+      
+      for (const chunk of line.chunks) {
+        if (chunk.isVerseNum) {
+           wordsWidth += chunk.width
+           totalSpaces += 1
+        } else {
+           const words = chunk.text.trim().split(/\s+/).filter(Boolean)
+           ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
+           wordsWidth += words.reduce((sum, word) => sum + ctx.measureText(word).width, 0)
+           totalSpaces += Math.max(0, words.length - 1)
         }
-      } else {
-        drawStyledLine(line, textRectX, currentY)
       }
-      drawTextDecorationLine(
-        ctx,
-        verseDecoration,
-        vt.color,
-        "left",
-        textRectX,
-        currentY,
-        textRectWidth,
-        actualFontSize,
-        textRectX,
-      )
+      
+      const gap = totalSpaces > 0 ? (textRectWidth - wordsWidth) / totalSpaces : 0
+      let cursorX = textRectX
+      
+      for (const chunk of line.chunks) {
+        if (chunk.isVerseNum) {
+           drawChunk(chunk, cursorX, currentY)
+           cursorX += chunk.width + gap
+        } else {
+           const words = chunk.text.trim().split(/\s+/).filter(Boolean)
+           ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
+           for (const word of words) {
+             drawChunk({ text: word, isVerseNum: false, width: 0 }, cursorX, currentY)
+             cursorX += ctx.measureText(word).width + gap
+           }
+        }
+      }
+      
+      drawTextDecorationLine(ctx, verseDecoration, vt.color, "left", textRectX, currentY, textRectWidth, actualFontSize, textRectX)
     } else {
-      drawStyledLine(line, x, currentY)
-      const lineWidth = Math.min(textRectWidth, Math.max(1, ctx.measureText(line).width))
-      drawTextDecorationLine(
-        ctx,
-        verseDecoration,
-        vt.color,
-        verseAlign,
-        x,
-        currentY,
-        lineWidth,
-        actualFontSize,
-        textRectX,
-      )
+      const lineDrawX = alignX(verseAlign === "justify" ? "left" : verseAlign, textRectX, textRectWidth)
+      let cursorX = verseAlign === "center" ? lineDrawX - line.width / 2 : verseAlign === "right" ? lineDrawX - line.width : lineDrawX
+      
+      for (let i = 0; i < line.chunks.length; i++) {
+        const chunk = line.chunks[i]
+        drawChunk(chunk, cursorX, currentY)
+        ctx.font = `${vt.fontWeight} ${chunk.isVerseNum ? actualNumFontSize : actualFontSize}px "${vt.fontFamily}", serif`
+        const spaceWidth = i < line.chunks.length - 1 ? ctx.measureText(" ").width : 0
+        cursorX += chunk.width + spaceWidth
+      }
+      
+      drawTextDecorationLine(ctx, verseDecoration, vt.color, verseAlign, lineDrawX, currentY, line.width, actualFontSize, textRectX)
     }
+    
     currentY += lineHeightPx
   }
 
@@ -567,7 +691,6 @@ function measureVerseHeight(
   textRectWidth: number,
 ): { height: number; maxLineWidth: number } {
   const vt = theme.verseText
-  const vn = theme.verseNumbers
   const verseAlign = resolveHorizontalAlign(vt.horizontalAlign, theme.layout.textAlign, true)
   const lineHeightPx = vt.fontSize * vt.lineHeight
   ctx.save()
@@ -575,18 +698,15 @@ function measureVerseHeight(
   if (vt.letterSpacing > 0) {
     try { ctx.letterSpacing = `${vt.letterSpacing}px` } catch { /* unsupported in some WebViews */ }
   }
-  let fullText = ""
-  const showNumbers = vn.visible && verse.segments.length > 1
-  for (const segment of verse.segments) {
-    if (showNumbers && segment.verseNumber !== undefined) fullText += `${segment.verseNumber} `
-    fullText += `${segment.text} `
-  }
-  const transformed = applyTextTransform(fullText.trim(), resolveTextTransform(vt.textTransform))
-  const lines = wrapText(ctx, transformed, textRectWidth)
+  
+  const lines = wrapTokens(ctx, theme, verse, textRectWidth)
+  
   let maxLineWidth = 0
-  for (const [index, line] of lines.entries()) {
-    const isJustifiedLine = verseAlign === "justify" && index < lines.length - 1 && /\s+/.test(line)
-    const width = isJustifiedLine ? textRectWidth : ctx.measureText(line).width
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
+    const lineText = line.chunks.map(c => c.text).join(" ")
+    const isJustifiedLine = verseAlign === "justify" && index < lines.length - 1 && /\s+/.test(lineText) && line.width > textRectWidth * 0.75
+    const width = isJustifiedLine ? textRectWidth : line.width
     if (width > maxLineWidth) maxLineWidth = width
   }
   ctx.restore()

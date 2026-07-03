@@ -3,36 +3,40 @@ import type { Verse } from "@/types"
 
 export interface HistoryItem {
   id: string
-  verse: Verse
+  verses: Verse[]
+  verse?: Verse // Legacy fallback
   translationId: number
   timestamp: number
 }
 
 interface HistoryState {
   items: HistoryItem[]
-  addItem: (verse: Verse, translationId: number) => void
+  addItem: (verses: Verse[], translationId: number) => void
   clearHistory: () => void
 }
 
 export const useHistoryStore = create<HistoryState>((set) => ({
   items: [],
-  addItem: (verse, translationId) =>
+  addItem: (verses, translationId) =>
     set((state) => {
-      // Avoid adding the exact same verse consecutively
+      if (!verses || verses.length === 0) return state
+      
       const lastItem = state.items[0]
+      const lastVerses = lastItem?.verses || (lastItem?.verse ? [lastItem.verse] : [])
+      
+      // Avoid adding the exact same verses consecutively
       if (
         lastItem &&
-        lastItem.verse.book_number === verse.book_number &&
-        lastItem.verse.chapter === verse.chapter &&
-        lastItem.verse.verse === verse.verse &&
-        lastItem.translationId === translationId
+        lastItem.translationId === translationId &&
+        lastVerses.length === verses.length &&
+        lastVerses.every((v, i) => v.id === verses[i].id)
       ) {
         return state
       }
 
       const newItem: HistoryItem = {
         id: crypto.randomUUID(),
-        verse,
+        verses,
         translationId,
         timestamp: Date.now(),
       }

@@ -29,12 +29,13 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   addItem: (item) =>
     set((state) => {
-      const duplicate = state.items.some(
-        (i) =>
-          i.verse.book_number === item.verse.book_number &&
-          i.verse.chapter === item.verse.chapter &&
-          i.verse.verse === item.verse.verse,
-      )
+      const duplicate = state.items.some((i) => {
+        const itemVerses = item.verses || (item.verse ? [item.verse] : [])
+        const iVerses = i.verses || (i.verse ? [i.verse] : [])
+        
+        return iVerses.length === itemVerses.length && 
+               iVerses.every((v, idx) => v.id === itemVerses[idx].id)
+      })
       if (duplicate) return state
       return { items: [item, ...state.items] }
     }),
@@ -57,37 +58,50 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     flashTimer = setTimeout(() => set({ highlightedId: null }), 1500)
   },
   findDuplicate: (bookNumber, chapter, verse) =>
-    get().items.findIndex(
-      (i) =>
-        i.verse.book_number === bookNumber &&
-        i.verse.chapter === chapter &&
-        i.verse.verse === verse,
-    ),
+    get().items.findIndex((i) => {
+      const iVerses = i.verses || (i.verse ? [i.verse] : [])
+      return iVerses.length === 1 &&
+             iVerses[0].book_number === bookNumber &&
+             iVerses[0].chapter === chapter &&
+             iVerses[0].verse === verse
+    }),
   updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
     let found = false
     set((state) => {
       // First try exact match: same book + same chapter
-      let idx = state.items.findIndex(
-        (i) =>
+      let idx = state.items.findIndex((i) => {
+        const iVerses = i.verses || (i.verse ? [i.verse] : [])
+        return (
           i.is_chapter_only &&
-          i.verse.book_number === bookNumber &&
-          i.verse.chapter === chapter,
-      )
+          iVerses.length === 1 &&
+          iVerses[0].book_number === bookNumber &&
+          iVerses[0].chapter === chapter
+        )
+      })
       // Fallback: same book, any chapter (book-only detection guessed chapter 1)
       if (idx === -1) {
-        idx = state.items.findIndex(
-          (i) =>
+        idx = state.items.findIndex((i) => {
+          const iVerses = i.verses || (i.verse ? [i.verse] : [])
+          return (
             i.is_chapter_only &&
-            i.verse.book_number === bookNumber,
-        )
+            iVerses.length === 1 &&
+            iVerses[0].book_number === bookNumber
+          )
+        })
       }
       if (idx === -1) return state
-      found = true
       const items = [...state.items]
       const item = { ...items[idx] }
-      item.verse = { ...item.verse, verse, text: verseText }
-      item.reference = reference
-      item.is_chapter_only = false
+      const itemVerses = item.verses || (item.verse ? [item.verse] : [])
+      if (itemVerses.length === 1 && itemVerses[0].book_number === bookNumber && itemVerses[0].chapter === chapter && item.is_chapter_only) {
+        // Update the verse in place
+        itemVerses[0].verse = verse
+        itemVerses[0].text = verseText
+        item.verses = itemVerses
+        item.reference = reference
+        item.is_chapter_only = false
+        found = true
+      }
       items[idx] = item
       return { items }
     })

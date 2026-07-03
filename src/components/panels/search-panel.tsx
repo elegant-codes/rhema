@@ -69,7 +69,7 @@ export function SearchPanel() {
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState(1)
-  const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null)
+  const [lastSelectedVerseId, setLastSelectedVerseId] = useState<number | null>(null)
   const [contextQuery, setContextQuery] = useState("")
 
   // EasyWorship-style autocomplete
@@ -86,13 +86,16 @@ export function SearchPanel() {
     currentChapter,
     semanticResults,
     activeTranslationId,
-    selectedVerse,
+    selectedVerses,
   } = useBible()
 
   const queueItems = useQueueStore((s) => s.items)
   const queuedVerseKeys = useMemo(() => {
     return new Set(
-      queueItems.map((item) => `${item.verse.book_number}:${item.verse.chapter}:${item.verse.verse}`)
+      queueItems.flatMap((item) => {
+        const verses = item.verses || (item.verse ? [item.verse] : [])
+        return verses.map((v) => `${v.book_number}:${v.chapter}:${v.verse}`)
+      })
     )
   }, [queueItems])
 
@@ -116,24 +119,24 @@ export function SearchPanel() {
     }
   }, [selectedBookNumber, chapter, activeTranslationId])
 
-  const effectiveSelectedVerseId = useMemo(() => {
-    if (!selectedVerseId || currentChapter.length === 0) return null
-    if (currentChapter.some((v) => v.id === selectedVerseId)) return selectedVerseId
-    if (!selectedVerse) return null
-    return currentChapter.find((v) => v.verse === selectedVerse.verse)?.id ?? null
-  }, [currentChapter, selectedVerseId, selectedVerse])
+  const effectiveSelectedVerseIds = useMemo(() => {
+    return new Set(selectedVerses.map(v => v.id))
+  }, [selectedVerses])
 
   // After chapter reloads (e.g., translation change), re-select by verse number
   useEffect(() => {
-    if (!selectedVerseId || !selectedVerse || currentChapter.length === 0) return
-    const stillExists = currentChapter.some((v) => v.id === selectedVerseId)
-    if (!stillExists) {
-      const match = currentChapter.find((v) => v.verse === selectedVerse.verse)
-      if (match && match.id !== selectedVerse.id) {
-        bibleActions.selectVerse(match)
-      }
+    if (selectedVerses.length === 0 || currentChapter.length === 0) return
+    const newSelection = selectedVerses.map(sv => {
+      const stillExists = currentChapter.some(v => v.id === sv.id)
+      if (stillExists) return sv
+      const match = currentChapter.find(v => v.verse === sv.verse)
+      return match || null
+    }).filter((v): v is NonNullable<typeof v> => v !== null)
+    
+    if (newSelection.length > 0 && newSelection.some((v, i) => v.id !== selectedVerses[i]?.id)) {
+      bibleActions.selectVerses(newSelection)
     }
-  }, [currentChapter, selectedVerseId, selectedVerse])
+  }, [currentChapter, selectedVerses])
 
   const applyNavigationSelection = useCallback(
     (book: Book, navChapter: number) => {
@@ -169,8 +172,8 @@ export function SearchPanel() {
       bibleActions.loadChapter(bookNumber, navChapter).then((verses) => {
         const target = verses.find((v) => v.verse === navVerse)
         if (target) {
-          setSelectedVerseId(target.id)
-          bibleActions.selectVerse(target)
+          setLastSelectedVerseId(target.id)
+          bibleActions.selectVerses([target])
           document
             .getElementById(`verse-${target.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -184,11 +187,55 @@ export function SearchPanel() {
     return unsubscribe
   }, [applyNavigationSelection])
 
-  const handleVerseClick = useCallback((verse: Verse) => {
-    setSelectedVerseId(verse.id)
-    bibleActions.selectVerse(verse)
+  const handleVerseClick = useCallback((verse: Verse, e: React.MouseEvent) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+    const isCmd = isMac ? e.metaKey : e.ctrlKey
+    
+    let newSelection = [...selectedVerses]
+    
+    if (e.shiftKey && lastSelectedVerseId) {
+      // Range selection
+      const currentIndex = currentChapter.findIndex(v => v.id === verse.id)
+      const lastIndex = currentChapter.findIndex(v => v.id === lastSelectedVerseId)
+      
+      if (currentIndex !== -1 && lastIndex !== -1) {
+        const start = Math.min(currentIndex, lastIndex)
+        const end = Math.max(currentIndex, lastIndex)
+        const range = currentChapter.slice(start, end + 1)
+        
+        if (isCmd) {
+          // Add range to existing selection
+          const existingIds = new Set(newSelection.map(v => v.id))
+          range.forEach(v => {
+            if (!existingIds.has(v.id)) newSelection.push(v)
+          })
+        } else {
+          // Replace selection with range
+          newSelection = range
+        }
+      } else {
+        newSelection = [verse]
+      }
+    } else if (isCmd) {
+      // Toggle single verse
+      const existingIdx = newSelection.findIndex(v => v.id === verse.id)
+      if (existingIdx !== -1) {
+        newSelection.splice(existingIdx, 1)
+      } else {
+        newSelection.push(verse)
+      }
+      setLastSelectedVerseId(verse.id)
+    } else {
+      // Single selection
+      newSelection = [verse]
+      setLastSelectedVerseId(verse.id)
+    }
+    
+    // Sort selection by verse order to keep it neat
+    newSelection.sort((a, b) => a.verse - b.verse)
+    bibleActions.selectVerses(newSelection)
     useBroadcastStore.getState().setLiveSongSlide(null, null)
-  }, [])
+  }, [currentChapter, selectedVerses, lastSelectedVerseId])
 
   // Arrow key navigation
   const handleKeyDown = useCallback(
@@ -197,25 +244,25 @@ export function SearchPanel() {
         e.preventDefault()
         if (chapter > 1) {
           setChapter((c) => c - 1)
-          setSelectedVerseId(null)
-          bibleActions.selectVerse(null)
+          setLastSelectedVerseId(null)
+          bibleActions.selectVerses([])
         }
       } else if (e.key === "ArrowRight") {
         e.preventDefault()
         setChapter((c) => c + 1)
-        setSelectedVerseId(null)
-        bibleActions.selectVerse(null)
+        setLastSelectedVerseId(null)
+        bibleActions.selectVerses([])
       } else if (e.key === "ArrowDown") {
         e.preventDefault()
         if (currentChapter.length === 0) return
-        const currentIdx = effectiveSelectedVerseId
-          ? currentChapter.findIndex((v) => v.id === effectiveSelectedVerseId)
+        const currentIdx = lastSelectedVerseId
+          ? currentChapter.findIndex((v) => v.id === lastSelectedVerseId)
           : -1
         const nextIdx = Math.min(currentIdx + 1, currentChapter.length - 1)
         const next = currentChapter[nextIdx]
         if (next) {
-          setSelectedVerseId(next.id)
-          bibleActions.selectVerse(next)
+          setLastSelectedVerseId(next.id)
+          bibleActions.selectVerses([next])
           document
             .getElementById(`verse-${next.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
@@ -223,21 +270,21 @@ export function SearchPanel() {
       } else if (e.key === "ArrowUp") {
         e.preventDefault()
         if (currentChapter.length === 0) return
-        const currentIdx = effectiveSelectedVerseId
-          ? currentChapter.findIndex((v) => v.id === effectiveSelectedVerseId)
+        const currentIdx = lastSelectedVerseId
+          ? currentChapter.findIndex((v) => v.id === lastSelectedVerseId)
           : currentChapter.length
         const prevIdx = Math.max(currentIdx - 1, 0)
         const prev = currentChapter[prevIdx]
         if (prev) {
-          setSelectedVerseId(prev.id)
-          bibleActions.selectVerse(prev)
+          setLastSelectedVerseId(prev.id)
+          bibleActions.selectVerses([prev])
           document
             .getElementById(`verse-${prev.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
         }
       }
     },
-    [chapter, currentChapter, effectiveSelectedVerseId]
+    [chapter, currentChapter, lastSelectedVerseId]
   )
 
   // Context search — hybrid backend (vector + FTS5 BM25) as primary,
@@ -567,8 +614,8 @@ export function SearchPanel() {
                 onClick={() => {
                   if (chapter > 1) {
                     setChapter((c) => c - 1)
-                    setSelectedVerseId(null)
-                    bibleActions.selectVerse(null)
+                    setLastSelectedVerseId(null)
+                    bibleActions.selectVerses([])
                   }
                 }}
                 disabled={chapter <= 1}
@@ -580,8 +627,8 @@ export function SearchPanel() {
                 size="icon-xs"
                 onClick={() => {
                   setChapter((c) => c + 1)
-                  setSelectedVerseId(null)
-                  bibleActions.selectVerse(null)
+                  setLastSelectedVerseId(null)
+                  bibleActions.selectVerses([])
                 }}
               >
                 <ArrowRightIcon className="size-3" />
@@ -597,18 +644,19 @@ export function SearchPanel() {
                 <div
                   key={verse.id}
                   id={`verse-${verse.id}`}
-                  onClick={() => handleVerseClick(verse)}
+                  onClick={(e) => handleVerseClick(verse, e)}
                   onDoubleClick={() => {
                     const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
-                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verse, translation))
+                    const versesToRender = effectiveSelectedVerseIds.has(verse.id) ? selectedVerses : [verse]
+                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(versesToRender, translation))
                     useBroadcastStore.getState().setLive(true)
                     import("@/stores").then(({ useHistoryStore }) => {
-                      useHistoryStore.getState().addItem(verse, activeTranslationId)
+                      useHistoryStore.getState().addItem(versesToRender, activeTranslationId)
                     })
                   }}
                   className={cn(
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
-                    verse.id === effectiveSelectedVerseId
+                    effectiveSelectedVerseIds.has(verse.id)
                       ? "border border-lime-500/50 bg-lime-500/10"
                       : "border border-transparent hover:bg-muted/50"
                   )}
@@ -651,16 +699,21 @@ export function SearchPanel() {
                             size="icon-xs"
                             className={cn(
                               "shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
-                              verse.id === effectiveSelectedVerseId
+                              effectiveSelectedVerseIds.has(verse.id)
                                 ? "hover:bg-lime-500/20 hover:text-lime-500"
                                 : "bg-primary/40! text-primary-foreground hover:bg-primary!"
                             )}
                             onClick={(e) => {
                               e.stopPropagation()
+                              const versesToAdd = effectiveSelectedVerseIds.has(verse.id) ? selectedVerses : [verse]
+                              const reference = versesToAdd.length > 1
+                                ? `${versesToAdd[0].book_name} ${versesToAdd[0].chapter}:${versesToAdd[0].verse}-${versesToAdd[versesToAdd.length - 1].verse}`
+                                : `${verse.book_name} ${verse.chapter}:${verse.verse}`
+
                               useQueueStore.getState().addItem({
                                 id: crypto.randomUUID(),
-                                verse,
-                                reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+                                verses: versesToAdd,
+                                reference,
                                 confidence: 1,
                                 source: "manual",
                                 added_at: Date.now(),
@@ -699,7 +752,7 @@ export function SearchPanel() {
                 <div
                   key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
                   onClick={() => {
-                    bibleActions.selectVerse({
+                    const verseData = {
                       id: 0,
                       translation_id: activeTranslationId,
                       book_number: result.book_number,
@@ -708,7 +761,9 @@ export function SearchPanel() {
                       chapter: result.chapter,
                       verse: result.verse,
                       text: result.verse_text,
-                    })
+                    }
+                    bibleActions.selectVerses([verseData])
+                    setLastSelectedVerseId(0) // Not heavily used for context
                     useBroadcastStore.getState().setLiveSongSlide(null, null)
                   }}
                   onDoubleClick={() => {
@@ -723,10 +778,10 @@ export function SearchPanel() {
                       verse: result.verse,
                       text: result.verse_text,
                     }
-                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verseData, translation))
+                    useBroadcastStore.getState().setLiveVerse(toVerseRenderData([verseData], translation))
                     useBroadcastStore.getState().setLive(true)
                     import("@/stores").then(({ useHistoryStore }) => {
-                      useHistoryStore.getState().addItem(verseData, activeTranslationId)
+                      useHistoryStore.getState().addItem([verseData], activeTranslationId)
                     })
                   }}
                   className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
@@ -779,7 +834,7 @@ export function SearchPanel() {
                             e.stopPropagation()
                             useQueueStore.getState().addItem({
                               id: crypto.randomUUID(),
-                              verse: {
+                              verses: [{
                                 id: 0,
                                 translation_id: activeTranslationId,
                                 book_number: result.book_number,
@@ -788,7 +843,7 @@ export function SearchPanel() {
                                 chapter: result.chapter,
                                 verse: result.verse,
                                 text: result.verse_text,
-                              },
+                              }],
                               reference: `${result.book_name} ${result.chapter}:${result.verse}`,
                               confidence: result.similarity,
                               source: "manual",

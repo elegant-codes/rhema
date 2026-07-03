@@ -17,7 +17,7 @@ describe("deriveLiveVerse", () => {
   it("returns null when live output is off", () => {
     const result = deriveLiveVerse({
       isLive: false,
-      selectedVerse: sampleVerse,
+      selectedVerses: [sampleVerse],
       translation: "NKJV",
     })
 
@@ -27,7 +27,7 @@ describe("deriveLiveVerse", () => {
   it("returns verse render data when live output is on", () => {
     const result = deriveLiveVerse({
       isLive: true,
-      selectedVerse: sampleVerse,
+      selectedVerses: [sampleVerse],
       translation: "NKJV",
     })
 

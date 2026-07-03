@@ -9,20 +9,20 @@ import { Button } from "@/components/ui/button"
 import { Send } from "lucide-react"
 
 export function PreviewPanel() {
-  const selectedVerse = useBibleStore((s) => s.selectedVerse)
+  const selectedVerses = useBibleStore((s) => s.selectedVerses)
   const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
-  // When translation changes, re-fetch the selected verse in the new translation
+  // When translation changes, re-fetch the selected verses in the new translation
   useEffect(() => {
-    const verse = useBibleStore.getState().selectedVerse
-    if (verse && verse.book_number > 0 && verse.chapter > 0 && verse.verse > 0) {
-      bibleActions
-        .fetchVerse(verse.book_number, verse.chapter, verse.verse)
-        .then((v) => {
-          if (v) bibleActions.selectVerse(v)
-        })
-        .catch(() => {})
+    const verses = useBibleStore.getState().selectedVerses
+    if (verses.length > 0) {
+      Promise.all(verses.map(v => 
+        bibleActions.fetchVerse(v.book_number, v.chapter, v.verse)
+      )).then(results => {
+        const validVerses = results.filter((v): v is NonNullable<typeof v> => v !== null)
+        if (validVerses.length > 0) bibleActions.selectVerses(validVerses)
+      }).catch(() => {})
     }
   }, [activeTranslationId])
   const themes = useBroadcastStore((s) => s.themes)
@@ -31,7 +31,7 @@ export function PreviewPanel() {
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
   const translation = translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
 
-  const verseData = selectedVerse ? toVerseRenderData(selectedVerse, translation) : null
+  const verseData = selectedVerses.length > 0 ? toVerseRenderData(selectedVerses, translation) : null
 
   return (
     <div
@@ -46,9 +46,9 @@ export function PreviewPanel() {
           onClick={() => {
             useBroadcastStore.getState().setLiveVerse(verseData)
             useBroadcastStore.getState().setLive(true)
-            if (selectedVerse) {
+            if (selectedVerses.length > 0) {
               import("@/stores").then(({ useHistoryStore }) => {
-                useHistoryStore.getState().addItem(selectedVerse, activeTranslationId)
+                useHistoryStore.getState().addItem(selectedVerses, activeTranslationId)
               })
             }
           }}

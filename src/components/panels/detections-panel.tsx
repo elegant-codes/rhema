@@ -25,7 +25,7 @@ function SourceBadge({ source }: { source: string }) {
 function DetectionCard({ detection }: { detection: DetectionResult }) {
   const handlePresent = () => {
     // Select this verse for preview
-    bibleActions.selectVerse({
+    bibleActions.selectVerses([{
       id: 0,
       translation_id: useBibleStore.getState().activeTranslationId,
       book_number: detection.book_number,
@@ -34,7 +34,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       chapter: detection.chapter,
       verse: detection.verse,
       text: detection.verse_text,
-    })
+    }])
     // Navigate book search panel to this verse
     if (detection.book_number > 0) {
       bibleActions.navigateToVerse(
@@ -47,12 +47,12 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
     const translation = useBibleStore.getState().translations
       .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
     useBroadcastStore.getState().setLiveVerse(
-      toVerseRenderData({
+      toVerseRenderData([{
         id: 0, translation_id: useBibleStore.getState().activeTranslationId,
         book_number: detection.book_number, book_name: detection.book_name,
         book_abbreviation: "", chapter: detection.chapter,
         verse: detection.verse, text: detection.verse_text,
-      }, translation)
+      }], translation)
     )
   }
 
@@ -84,7 +84,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           onClick={() => {
             useQueueStore.getState().addItem({
               id: crypto.randomUUID(),
-              verse: {
+              verses: [{
                 id: 0,
                 translation_id: useBibleStore.getState().activeTranslationId,
                 book_number: detection.book_number,
@@ -93,7 +93,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
                 chapter: detection.chapter,
                 verse: detection.verse,
                 text: detection.verse_text,
-              },
+              }],
               reference: detection.verse_ref,
               confidence: detection.confidence,
               source: detection.source === "direct" ? "ai-direct" : "ai-semantic",

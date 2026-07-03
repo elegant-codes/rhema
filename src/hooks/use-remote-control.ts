@@ -157,18 +157,19 @@ async function presentQueueItem(index: number) {
     const item = items[index]
     if (!item) return
 
-    const { verse } = item
-
+    const verses = item.verses || (item.verse ? [item.verse] : [])
+    
     // Fetch the full verse from the backend to ensure we have complete data
     // (AI-detected queue items may have partial verse objects)
-    const fullVerse = await invoke<Verse | null>("get_verse", {
-      translationId: useBibleStore.getState().activeTranslationId,
-      bookNumber: verse.book_number,
-      chapter: verse.chapter,
-      verse: verse.verse,
-    })
-
-    const verseToPresent = fullVerse ?? verse
+    const fullVerses = await Promise.all(verses.map(async (v) => {
+      const full = await invoke<Verse | null>("get_verse", {
+        translationId: useBibleStore.getState().activeTranslationId,
+        bookNumber: v.book_number,
+        chapter: v.chapter,
+        verse: v.verse,
+      })
+      return full ?? v
+    }))
 
     const bibleState = useBibleStore.getState()
     const translation =
@@ -176,10 +177,10 @@ async function presentQueueItem(index: number) {
         (t) => t.id === bibleState.activeTranslationId
       )?.abbreviation ?? "KJV"
 
-    bibleState.selectVerse(verseToPresent)
+    bibleState.selectVerses(fullVerses)
     useBroadcastStore
       .getState()
-      .setLiveVerse(toVerseRenderData(verseToPresent, translation))
+      .setLiveVerse(toVerseRenderData(fullVerses, translation))
   } catch (e) {
     console.warn("[remote-control] presentQueueItem failed:", e)
   }
