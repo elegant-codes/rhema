@@ -2,9 +2,27 @@
 
 Welcome to Rhema Studio Pro. This manual provides a comprehensive overview of all features and step-by-step instructions on how to use them effectively during a live worship service.
 
+
 ---
 
-## 🎵 1. Lyrics & Setlist Engine
+## 📖 1. Bible & AI Integration
+
+Rhema features next-generation AI capabilities directly built into the app.
+
+### How to use Semantic AI Search
+1. **Open Bible Search:** Navigate to the **Bible** panel.
+2. **Ask a Question:** Instead of typing a book and chapter, type a natural language question (e.g., *"What did Jesus say about anxiety?"*).
+3. **View Results:** The AI will scan the entire Bible locally and return the most semantically relevant verses.
+
+### How to use Deepgram Voice Detection (AI Auto-Projection)
+1. **Enable Microphone:** Click the microphone icon in the Bible panel.
+2. **Listen:** Rhema will listen to the pastor speaking.
+3. **Auto-Project:** When it detects a verse being read aloud, it will automatically project that verse onto the screen without you having to touch a button!
+
+
+---
+
+## 🎵 2. Lyrics & Setlist Engine
 
 Rhema's lyrics system is built for speed and reliability, featuring tools that allow you to prepare for a service in seconds and execute flawlessly.
 
@@ -30,7 +48,7 @@ If you paste a massive, unformatted block of text into the editor, Rhema can cle
 
 ---
 
-## ⌨️ 2. Live Keyboard Hotkeys
+## ⌨️ 3. Live Keyboard Hotkeys
 
 Rhema is designed to be entirely non-linear. If the worship leader unexpectedly repeats a Chorus, you don't need to frantically scroll with your mouse. You can jump there instantly with a single keystroke.
 
@@ -52,22 +70,6 @@ Rhema is designed to be entirely non-linear. If the worship leader unexpectedly 
 | **Jump to Ending** | `E` | Instantly jump to the `[Ending]` or `[Outro]`. |
 
 *(Pro-Tip: If a song has 3 Verses, pressing `V` repeatedly will cycle you smoothly from Verse 1 -> Verse 2 -> Verse 3).*
-
----
-
-## 📖 3. Bible & AI Integration
-
-Rhema features next-generation AI capabilities directly built into the app.
-
-### How to use Semantic AI Search
-1. **Open Bible Search:** Navigate to the **Bible** panel.
-2. **Ask a Question:** Instead of typing a book and chapter, type a natural language question (e.g., *"What did Jesus say about anxiety?"*).
-3. **View Results:** The AI will scan the entire Bible locally and return the most semantically relevant verses.
-
-### How to use Deepgram Voice Detection (AI Auto-Projection)
-1. **Enable Microphone:** Click the microphone icon in the Bible panel.
-2. **Listen:** Rhema will listen to the pastor speaking.
-3. **Auto-Project:** When it detects a verse being read aloud, it will automatically project that verse onto the screen without you having to touch a button!
 
 ---
 
