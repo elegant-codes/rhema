@@ -234,7 +234,6 @@ export function SearchPanel() {
     // Sort selection by verse order to keep it neat
     newSelection.sort((a, b) => a.verse - b.verse)
     bibleActions.selectVerses(newSelection)
-    useBroadcastStore.getState().setLiveSongSlide(null, null)
   }, [currentChapter, selectedVerses, lastSelectedVerseId])
 
   // Arrow key navigation

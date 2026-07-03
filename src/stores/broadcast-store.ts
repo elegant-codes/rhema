@@ -262,7 +262,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     get().syncBroadcastOutput()
   },
   setLiveVerse: (liveVerse) => {
-    set({ liveVerse })
+    set({ liveVerse, activeSongId: null, activeSlideIndex: null })
     get().syncBroadcastOutput()
   },
   

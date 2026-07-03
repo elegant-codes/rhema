@@ -92,9 +92,9 @@ export function getAutocompleteSuggestion(
     }
   }
 
-  // Parse: "NumberedBook Chapter:Verse" or "BookName Chapter:Verse"
-  // Match patterns like: "I J", "I John", "John", "John 3", "John 3:16"
-  const match = normalizedInput.match(/^([IVX]+\s+[a-zA-Z]+|[IVX]+\s+[a-zA-Z\s]+|[a-zA-Z\s]+?)\s*(\d+)?:?(\d+)?$/)
+  // Parse: "NumberedBook Chapter:Verse", "BookName Chapter:Verse", "BookName Chapter Verse"
+  // Match patterns like: "I J", "I John", "John", "John 3", "John 3:16", "John 3 16"
+  const match = normalizedInput.match(/^([IVX]+\s+[a-zA-Z]+|[IVX]+\s+[a-zA-Z\s]+|[a-zA-Z\s]+?)\s*(\d+)?(?:[:\s]+)?(\d+)?$/)
 
   if (!match) {
     return { suggestion: "", stage: "none" }
