@@ -424,8 +424,9 @@ function drawVerseText(
 
   // Build full text with verse numbers inline
   let fullText = ""
+  const showNumbers = vn.visible && verse.segments.length > 1
   for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) {
+    if (showNumbers && segment.verseNumber !== undefined) {
       fullText += `${segment.verseNumber} `
     }
     fullText += segment.text + " "
@@ -575,8 +576,9 @@ function measureVerseHeight(
     try { ctx.letterSpacing = `${vt.letterSpacing}px` } catch { /* unsupported in some WebViews */ }
   }
   let fullText = ""
+  const showNumbers = vn.visible && verse.segments.length > 1
   for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) fullText += `${segment.verseNumber} `
+    if (showNumbers && segment.verseNumber !== undefined) fullText += `${segment.verseNumber} `
     fullText += `${segment.text} `
   }
   const transformed = applyTextTransform(fullText.trim(), resolveTextTransform(vt.textTransform))

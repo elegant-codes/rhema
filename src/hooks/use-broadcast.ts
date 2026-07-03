@@ -3,9 +3,18 @@ import type { VerseRenderData } from "@/types"
 import type { Verse } from "@/types"
 
 export function toVerseRenderData(verse: Verse, translation: string): VerseRenderData {
+  let cleanText = verse.text.trim()
+  const prefix = `${verse.verse} `
+  if (cleanText.startsWith(prefix)) {
+    cleanText = cleanText.substring(prefix.length).trim()
+  } else if (cleanText.startsWith(`${verse.verse}\xa0`)) {
+    // Handle non-breaking space as well
+    cleanText = cleanText.substring(String(verse.verse).length + 1).trim()
+  }
+
   return {
     reference: `${verse.book_name} ${verse.chapter}:${verse.verse} (${translation})`,
-    segments: [{ verseNumber: verse.verse, text: verse.text }],
+    segments: [{ verseNumber: verse.verse, text: cleanText }],
   }
 }
 
