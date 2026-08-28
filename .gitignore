@@ -48,6 +48,13 @@ detailed-plan.md
 
 docs/superpowers
 data/bg_temp
+data/bg_temp_extra
+__pycache__/
+*.pyc
+
+# BibleGateway scraping scripts and outputs (kept locally, not committed)
+data/download-biblegateway.py
+data/download-biblegateway-extra.py
 GHS-1-260.md
 ghs.json
 

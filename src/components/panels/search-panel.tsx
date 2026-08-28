@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useBible, bibleActions } from "@/hooks/use-bible"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { presentVerses, toVerseRenderData } from "@/hooks/use-broadcast"
 import { useBibleStore, useQueueStore, useBroadcastStore } from "@/stores"
 import type { Book, Verse, SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
@@ -153,6 +153,18 @@ export function SearchPanel() {
     []
   )
 
+  // Scroll the selected verse(s) into view when requested.
+  const revealRequest = useBibleStore((s) => s.revealRequest)
+  useEffect(() => {
+    if (revealRequest === 0) return
+    const { selectedVerses, revealBlock } = useBibleStore.getState()
+    const target = selectedVerses[0]
+    if (!target) return
+    document
+      .getElementById(`verse-${target.id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: revealBlock })
+  }, [revealRequest])
+
   // Auto-navigate when a detection or "Present" click sets pendingNavigation
   useEffect(() => {
     let lastHandledKey: string | null = null
@@ -180,9 +192,10 @@ export function SearchPanel() {
         if (target) {
           setLastSelectedVerseId(target.id)
           bibleActions.selectVerses([target])
-          document
-            .getElementById(`verse-${target.id}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" })
+          useBibleStore.getState().requestVerseReveal("center")
+          if (pendingNavigation.present) {
+            void presentVerses([target])
+          }
         }
         panelRef.current?.focus()
       }).catch(console.error).finally(() => {
@@ -268,9 +281,7 @@ export function SearchPanel() {
         if (next) {
           setLastSelectedVerseId(next.id)
           bibleActions.selectVerses([next])
-          document
-            .getElementById(`verse-${next.id}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+          useBibleStore.getState().requestVerseReveal("nearest")
         }
       } else if (e.key === "ArrowUp") {
         e.preventDefault()
@@ -283,9 +294,7 @@ export function SearchPanel() {
         if (prev) {
           setLastSelectedVerseId(prev.id)
           bibleActions.selectVerses([prev])
-          document
-            .getElementById(`verse-${prev.id}`)
-            ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+          useBibleStore.getState().requestVerseReveal("nearest")
         }
       }
     },

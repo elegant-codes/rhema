@@ -1053,11 +1053,12 @@ export function renderAlert(
   height: number,
   alertText: string,
   now: number,
+  position: "top" | "bottom" = "bottom",
 ): void {
   // Scale dynamically based on a 1080p reference height
   const scale = height / 1080
   const barHeight = 120 * scale
-  const y = height - barHeight
+  const y = position === "top" ? 0 : height - barHeight
 
   // Draw semi-transparent black bar
   ctx.fillStyle = "rgba(0, 0, 0, 0.85)"

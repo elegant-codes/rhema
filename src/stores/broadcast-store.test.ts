@@ -18,6 +18,7 @@ describe("broadcast store sync", () => {
     const theme = useBroadcastStore.getState().themes[0]
     useBroadcastStore.setState({
       activeThemeId: theme.id,
+      isLive: true,
       liveVerse: {
       reference: "John 3:16",
         segments: [{ text: "For God so loved the world", verseNumber: 16 }],
@@ -34,6 +35,7 @@ describe("broadcast store sync", () => {
       expect.objectContaining({
         theme: expect.objectContaining({ id: theme.id }),
         verse: expect.objectContaining({ reference: "John 3:16" }),
+        alertPosition: "bottom",
       }),
     )
     expect(emitToMock).toHaveBeenCalledWith(
@@ -42,7 +44,24 @@ describe("broadcast store sync", () => {
       expect.objectContaining({
         theme: expect.objectContaining({ id: theme.id }),
         verse: expect.objectContaining({ reference: "John 3:16" }),
+        alertPosition: "bottom",
       }),
+    )
+  })
+
+  it("setAlertPosition updates state and re-syncs broadcast output", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const theme = useBroadcastStore.getState().themes[0]
+    useBroadcastStore.setState({ activeThemeId: theme.id })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().setAlertPosition("top")
+
+    expect(useBroadcastStore.getState().alertPosition).toBe("top")
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({ alertPosition: "top" }),
     )
   })
 })

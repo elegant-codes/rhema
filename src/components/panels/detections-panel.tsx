@@ -1,12 +1,13 @@
+import { useState, useEffect } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
 import { PlayIcon, PlusIcon } from "lucide-react"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { bibleActions } from "@/hooks/use-bible"
-import { useQueueStore, useBroadcastStore, useBibleStore } from "@/stores"
+import { useQueueStore, useBroadcastStore, useBibleStore, useDetectionStore } from "@/stores"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
-import type { DetectionResult } from "@/types"
+import type { DetectionResult, Verse } from "@/types"
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   direct: { bg: "bg-green-500/15", text: "text-green-600", label: "Direct" },
@@ -23,38 +24,110 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 function DetectionCard({ detection }: { detection: DetectionResult }) {
-  const handlePresent = () => {
-    // Select this verse for preview
-    bibleActions.selectVerses([{
-      id: 0,
-      translation_id: useBibleStore.getState().activeTranslationId,
-      book_number: detection.book_number,
-      book_name: detection.book_name,
-      book_abbreviation: "",
-      chapter: detection.chapter,
-      verse: detection.verse,
-      text: detection.verse_text,
-    }])
-    // Navigate book search panel to this verse
-    if (detection.book_number > 0) {
+  const [localText, setLocalText] = useState(detection.verse_text)
+  const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+
+  useEffect(() => {
+    if (detection.verse_text) {
+      setLocalText(detection.verse_text)
+      return
+    }
+    if (detection.book_number > 0 && detection.chapter > 0 && detection.verse > 0) {
+      bibleActions.fetchVerse(detection.book_number, detection.chapter, detection.verse, activeTranslationId)
+        .then((v) => {
+          if (v?.text) {
+            setLocalText(v.text)
+            useDetectionStore.getState().updateDetectionText(detection.verse_ref, v.text)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [detection.verse_ref, detection.verse_text, detection.book_number, detection.chapter, detection.verse, activeTranslationId])
+
+  const handlePresent = async () => {
+    let verseText = localText || detection.verse_text
+    let verseObj: Verse | null = null
+
+    if (detection.book_number > 0 && detection.chapter > 0 && detection.verse > 0) {
+      verseObj = await bibleActions.fetchVerse(
+        detection.book_number,
+        detection.chapter,
+        detection.verse,
+        activeTranslationId
+      )
+      if (verseObj?.text) {
+        verseText = verseObj.text
+      }
       bibleActions.navigateToVerse(
         detection.book_number,
         detection.chapter,
         detection.verse
       )
     }
-    // Set broadcast live verse
+
+    const finalVerse: Verse = verseObj ?? {
+      id: 0,
+      translation_id: activeTranslationId,
+      book_number: detection.book_number,
+      book_name: detection.book_name,
+      book_abbreviation: "",
+      chapter: detection.chapter,
+      verse: detection.verse,
+      text: verseText,
+    }
+
+    bibleActions.selectVerses([finalVerse])
+
     const translation = useBibleStore.getState().translations
-      .find(t => t.id === useBibleStore.getState().activeTranslationId)?.abbreviation ?? "KJV"
+      .find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
     useBroadcastStore.getState().setLiveVerse(
-      toVerseRenderData([{
-        id: 0, translation_id: useBibleStore.getState().activeTranslationId,
-        book_number: detection.book_number, book_name: detection.book_name,
-        book_abbreviation: "", chapter: detection.chapter,
-        verse: detection.verse, text: detection.verse_text,
-      }], translation)
+      toVerseRenderData([finalVerse], translation)
     )
+    useBroadcastStore.getState().setLive(true)
+    import("@/stores").then(({ useHistoryStore }) => {
+      useHistoryStore.getState().addItem([finalVerse], activeTranslationId)
+    })
   }
+
+  const handleQueue = async () => {
+    let verseText = localText || detection.verse_text
+    let verseObj: Verse | null = null
+
+    if (detection.book_number > 0 && detection.chapter > 0 && detection.verse > 0) {
+      verseObj = await bibleActions.fetchVerse(
+        detection.book_number,
+        detection.chapter,
+        detection.verse,
+        activeTranslationId
+      )
+      if (verseObj?.text) {
+        verseText = verseObj.text
+      }
+    }
+
+    const finalVerse: Verse = verseObj ?? {
+      id: 0,
+      translation_id: activeTranslationId,
+      book_number: detection.book_number,
+      book_name: detection.book_name,
+      book_abbreviation: "",
+      chapter: detection.chapter,
+      verse: detection.verse,
+      text: verseText,
+    }
+
+    useQueueStore.getState().addItem({
+      id: crypto.randomUUID(),
+      type: "verse",
+      verses: [finalVerse],
+      reference: detection.verse_ref,
+      confidence: detection.confidence,
+      source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
+      added_at: Date.now(),
+    })
+  }
+
+  const textToDisplay = localText || detection.verse_text
 
   return (
     <div className="border-b border-border p-3 last:border-0">
@@ -66,11 +139,11 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
         </span>
       </div>
 
-      {detection.verse_text && (
+      {textToDisplay ? (
         <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-          {detection.verse_text}
+          {textToDisplay}
         </p>
-      )}
+      ) : null}
 
       <div className="mt-2 flex gap-2">
         <Button size="sm" className="gap-1" onClick={handlePresent}>
@@ -81,26 +154,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           variant="outline"
           size="sm"
           className="gap-1"
-          onClick={() => {
-            useQueueStore.getState().addItem({
-              id: crypto.randomUUID(),
-              type: "verse",
-              verses: [{
-                id: 0,
-                translation_id: useBibleStore.getState().activeTranslationId,
-                book_number: detection.book_number,
-                book_name: detection.book_name,
-                book_abbreviation: "",
-                chapter: detection.chapter,
-                verse: detection.verse,
-                text: detection.verse_text,
-              }],
-              reference: detection.verse_ref,
-              confidence: detection.confidence,
-              source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
-              added_at: Date.now(),
-            })
-          }}
+          onClick={handleQueue}
         >
           <PlusIcon className="size-3" />
           Queue

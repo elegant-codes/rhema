@@ -65,6 +65,11 @@ pub fn to_result(state: &AppState, merged: &MergedDetection) -> DetectionResult 
             if let Ok(Some(v)) = db.get_verse(state.active_translation_id, vr.book_number, vr.chapter, vr.verse_start) {
                 return Some(v);
             }
+            if state.active_translation_id != 1 {
+                if let Ok(Some(v)) = db.get_verse(1, vr.book_number, vr.chapter, vr.verse_start) {
+                    return Some(v);
+                }
+            }
         }
         None
     });

@@ -2,12 +2,14 @@ import { useState } from "react"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { PlayIcon, SquareIcon, BellRingIcon } from "lucide-react"
+import { PlayIcon, SquareIcon, BellRingIcon, AlignStartVerticalIcon, AlignEndVerticalIcon } from "lucide-react"
 
 export function AlertsPanel() {
   const [alertText, setAlertText] = useState("")
   const liveAlert = useBroadcastStore((s) => s.liveAlert)
   const setLiveAlert = useBroadcastStore((s) => s.setLiveAlert)
+  const alertPosition = useBroadcastStore((s) => s.alertPosition)
+  const setAlertPosition = useBroadcastStore((s) => s.setAlertPosition)
 
   const presetMessages = [
     "Nursery worker needed in Room 1",
@@ -34,6 +36,32 @@ export function AlertsPanel() {
         <h2 className="text-lg font-semibold text-foreground">Live Alerts</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-muted-foreground">Position</label>
+            <div className="flex items-center rounded-md border border-border bg-background/50 p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-7 gap-1 px-2 text-xs ${alertPosition === "top" ? "bg-muted" : ""}`}
+                onClick={() => setAlertPosition("top")}
+              >
+                <AlignStartVerticalIcon className="size-3.5" />
+                Top
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-7 gap-1 px-2 text-xs ${alertPosition === "bottom" ? "bg-muted" : ""}`}
+                onClick={() => setAlertPosition("bottom")}
+              >
+                <AlignEndVerticalIcon className="size-3.5" />
+                Bottom
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           <label className="text-sm font-medium text-muted-foreground">Custom Message</label>
           <div className="flex gap-2">

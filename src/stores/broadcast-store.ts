@@ -13,6 +13,7 @@ interface BroadcastState {
   isLive: boolean
   liveVerse: VerseRenderData | null
   liveAlert: string | null
+  alertPosition: "top" | "bottom"
 
   // Image Library
   imageLibrary: string[]
@@ -45,6 +46,7 @@ interface BroadcastState {
   setLive: (live: boolean) => void
   setLiveVerse: (verse: VerseRenderData | null) => void
   setLiveAlert: (text: string | null) => void
+  setAlertPosition: (position: "top" | "bottom") => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
 
@@ -111,6 +113,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
       theme: state.draftTheme,
       verse: state.liveVerse,
       alert: state.liveAlert,
+      alertPosition: state.alertPosition,
     }).catch(() => {})
   }
   if (id === state.altActiveThemeId) {
@@ -118,6 +121,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
       theme: state.draftTheme,
       verse: state.liveVerse,
       alert: state.liveAlert,
+      alertPosition: state.alertPosition,
     }).catch(() => {})
   }
 }
@@ -129,6 +133,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   isLive: false,
   liveVerse: null,
   liveAlert: null,
+  alertPosition: "bottom",
   imageLibrary: [],
   liveImage: null,
   liveImageFit: "cover",
@@ -249,6 +254,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       theme: activeTheme,
       verse: content,
       alert: s.liveAlert,
+      alertPosition: s.alertPosition,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -275,7 +281,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({ liveAlert: text })
     get().syncBroadcastOutput()
   },
-  
+  setAlertPosition: (position) => {
+    set({ alertPosition: position })
+    get().syncBroadcastOutput()
+  },
+
   // Image Library
   addImageToLibrary: (paths) => set((s) => ({ imageLibrary: [...new Set([...s.imageLibrary, ...paths])] })),
   removeImageFromLibrary: (path) => set((s) => ({
@@ -420,6 +430,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const altActiveId = (await store.get("altActiveThemeId")) as string | undefined
       const imageLibrary = (await store.get("imageLibrary")) as string[] | undefined
       const songs = (await store.get("songs")) as Song[] | undefined
+      const alertPosition = (await store.get("alertPosition")) as "top" | "bottom" | undefined
 
       const patch: Partial<BroadcastState> = {}
       if (customThemes && Array.isArray(customThemes) && customThemes.length > 0) {
@@ -429,6 +440,7 @@ export function hydrateBroadcastThemes(): Promise<void> {
       if (altActiveId) patch.altActiveThemeId = altActiveId
       if (imageLibrary && Array.isArray(imageLibrary)) patch.imageLibrary = imageLibrary
       if (songs && Array.isArray(songs)) patch.songs = songs
+      if (alertPosition) patch.alertPosition = alertPosition
 
       if (Object.keys(patch).length > 0) {
         useBroadcastStore.setState(patch)
@@ -441,7 +453,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
           state.activeThemeId !== prevState.activeThemeId ||
           state.altActiveThemeId !== prevState.altActiveThemeId ||
           state.imageLibrary !== prevState.imageLibrary ||
-          state.songs !== prevState.songs
+          state.songs !== prevState.songs ||
+          state.alertPosition !== prevState.alertPosition
         if (!changed) return
         if (saveTimer) clearTimeout(saveTimer)
         saveTimer = setTimeout(() => {
@@ -471,6 +484,7 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("altActiveThemeId", state.altActiveThemeId)
     await store.set("imageLibrary", state.imageLibrary)
     await store.set("songs", state.songs)
+    await store.set("alertPosition", state.alertPosition)
     await store.save()
   } catch {
     console.warn("[broadcast] Failed to persist themes")

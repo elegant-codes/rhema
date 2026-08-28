@@ -80,6 +80,8 @@ const TRANSLATIONS_META: Array<{
   { file: "SpaRV.json", abbreviation: "SpaRV", title: "Reina-Valera 1909", language: "es", license: "Public Domain" },
   { file: "FreJND.json", abbreviation: "FreJND", title: "J.N. Darby French 1885", language: "fr", license: "Public Domain" },
   { file: "PorBLivre.json", abbreviation: "PorBLivre", title: "Biblia Livre", language: "pt", license: "Public Domain" },
+  { file: "AMPC.json", abbreviation: "AMPC", title: "Amplified Bible Classic", language: "en", license: "Personal" },
+  { file: "MSG.json", abbreviation: "MSG", title: "The Message", language: "en", license: "Personal" },
 ]
 
 function main() {
@@ -140,8 +142,8 @@ function main() {
     // Insert books and verses
     for (let bookIdx = 0; bookIdx < data.books.length; bookIdx++) {
       const book = data.books[bookIdx]
-      const bookNumber = bookIdx + 1
       const abbrev = BOOK_ABBREVS[book.name] || book.name.substring(0, 4)
+      const bookNumber = OSIS_TO_NUM[abbrev] || (bookIdx + 1)
       const testament = bookNumber <= 39 ? "OT" : "NT"
 
       insertBook.run(tId, bookNumber, book.name, abbrev, testament)

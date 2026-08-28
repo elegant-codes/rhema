@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client"
-import { useRef, useEffect, useCallback } from "react"
+import { useRef, useEffect, useCallback, useState } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { renderVerse, renderAlert } from "@/lib/verse-renderer"
@@ -27,7 +27,8 @@ const OUTPUT_ID = new URLSearchParams(window.location.search).get("output") ?? "
 interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
-  alert?: string | null
+  alert: string | null
+  alertPosition: "top" | "bottom"
 }
 
 function BroadcastCanvas() {
@@ -35,6 +36,7 @@ function BroadcastCanvas() {
   const latestData = useRef<BroadcastPayload | null>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement | HTMLVideoElement>>(new Map())
   const isVideoPlayingRef = useRef(false)
+  const lastResolutionRef = useRef<{ width: number; height: number } | null>(null)
   const ndiConfigRef = useRef<NdiConfigEventPayload>({
     active: false,
     fps: 24,
@@ -44,6 +46,16 @@ function BroadcastCanvas() {
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastPushRef = useRef(0)
   const pushingRef = useRef(false)
+  const alertTextRef = useRef<HTMLSpanElement>(null)
+
+  // React state for the CSS alert overlay. We keep this minimal so the overlay
+  // re-renders when the alert text/position changes, while the canvas draw loop
+  // reads from refs to avoid re-renders on every frame.
+  const [alertState, setAlertState] = useState<{
+    text: string
+    position: "top" | "bottom"
+    duration: number
+  } | null>(null)
 
   const logDebug = useCallback((message: string, meta?: unknown) => {
     if (!import.meta.env.DEV) return
@@ -68,9 +80,22 @@ function BroadcastCanvas() {
       return
     }
 
-    const { theme, verse, alert } = data
-    canvas.width = theme.resolution.width
-    canvas.height = theme.resolution.height
+    const { theme, verse } = data
+
+    // Only resize the canvas when the theme resolution actually changes.
+    // Setting width/height every frame clears the canvas and reallocates the
+    // backing store, which causes stutter — especially with video backgrounds.
+    const lastRes = lastResolutionRef.current
+    if (!lastRes || lastRes.width !== theme.resolution.width || lastRes.height !== theme.resolution.height) {
+      canvas.width = theme.resolution.width
+      canvas.height = theme.resolution.height
+      lastResolutionRef.current = { width: theme.resolution.width, height: theme.resolution.height }
+    }
+
+    // Clear the canvas before each draw. Without this, fit modes like
+    // "contain" can leave previous frames visible in the letterbox areas.
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
     const result = renderVerse(ctx, theme, verse, {
       scale: 1,
       imageCache: imageCacheRef.current,
@@ -79,11 +104,6 @@ function BroadcastCanvas() {
       ctx.fillStyle = "#000"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       logDebug("renderVerse returned null; drew fallback frame")
-    }
-
-    if (alert) {
-      renderAlert(ctx, canvas.width, canvas.height, alert, now)
-      requestAnimationFrame(() => draw(performance.now()))
     }
   }, [logDebug])
 
@@ -96,7 +116,7 @@ function BroadcastCanvas() {
 
     const url = bg.image.url
     const isVideo = /\.(mp4|webm)$/i.test(url)
-    
+
     const cache = imageCacheRef.current
     if (cache.has(url)) {
       isVideoPlayingRef.current = isVideo
@@ -169,21 +189,37 @@ function BroadcastCanvas() {
       const targetWidth = ndiConfigRef.current.width
       const targetHeight = ndiConfigRef.current.height
 
-      let sourceCtx = ctx
-      let sourceWidth = canvas.width
-      let sourceHeight = canvas.height
+      const data = latestData.current
+      const hasAlert = !!data?.alert
+      const alertPosition = data?.alertPosition ?? "bottom"
 
-      if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      // Always use an offscreen canvas for NDI when an alert is active, because
+      // the visible canvas no longer draws the alert (CSS overlay handles that).
+      // Otherwise reuse the main canvas if sizes already match.
+      let sourceCtx: CanvasRenderingContext2D
+      let sourceWidth: number
+      let sourceHeight: number
+
+      if (hasAlert || canvas.width !== targetWidth || canvas.height !== targetHeight) {
         const ndiCanvas = ndiCanvasRef.current ?? document.createElement("canvas")
         ndiCanvas.width = targetWidth
         ndiCanvas.height = targetHeight
         const ndiCtx = ndiCanvas.getContext("2d")
         if (!ndiCtx) return
         ndiCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight)
+
+        if (hasAlert && data.alert) {
+          renderAlert(ndiCtx, targetWidth, targetHeight, data.alert, performance.now(), alertPosition)
+        }
+
         ndiCanvasRef.current = ndiCanvas
         sourceCtx = ndiCtx
         sourceWidth = targetWidth
         sourceHeight = targetHeight
+      } else {
+        sourceCtx = ctx
+        sourceWidth = canvas.width
+        sourceHeight = canvas.height
       }
 
       const imageData = sourceCtx.getImageData(0, 0, sourceWidth, sourceHeight)
@@ -212,12 +248,32 @@ function BroadcastCanvas() {
     setTimeout(() => void pushNdiFrame(), 300)
   }, [pushNdiFrame])
 
+  // Recalculate CSS marquee duration when the alert text changes.
+  useEffect(() => {
+    if (!alertState) return
+    const textEl = alertTextRef.current
+    if (!textEl) return
+
+    const measureAndUpdate = () => {
+      const textWidth = textEl.offsetWidth
+      const speed = 150 * (window.innerHeight / 1080)
+      const totalDistance = window.innerWidth + textWidth
+      const duration = Math.max(totalDistance / speed, 5) // min 5s for very short text
+      setAlertState((prev) => (prev ? { ...prev, duration } : prev))
+    }
+
+    measureAndUpdate()
+    window.addEventListener("resize", measureAndUpdate)
+    return () => window.removeEventListener("resize", measureAndUpdate)
+  }, [alertState?.text, alertState?.position])
+
   useEffect(() => {
     // Set initial canvas size
     const canvas = canvasRef.current
     if (canvas) {
       canvas.width = 1920
       canvas.height = 1080
+      lastResolutionRef.current = { width: 1920, height: 1080 }
       const ctx = canvas.getContext("2d")
       if (ctx) {
         ctx.fillStyle = "#000"
@@ -234,6 +290,18 @@ function BroadcastCanvas() {
         hasVerse: Boolean(event.payload.verse),
         themeId: event.payload.theme.id,
       })
+
+      // Update React state for the CSS alert overlay.
+      if (event.payload.alert) {
+        setAlertState({
+          text: event.payload.alert,
+          position: event.payload.alertPosition,
+          duration: 20, // initial placeholder, recalculated by effect above
+        })
+      } else {
+        setAlertState(null)
+      }
+
       draw()
       pushNdiBurst()
     })
@@ -286,21 +354,23 @@ function BroadcastCanvas() {
     return () => clearInterval(timer)
   }, [pushNdiFrame])
 
-  // Animation loop for video playback
+  // Animation loop for video playback and alert motion.
+  // The alert itself is now a CSS animation (compositor thread), so this loop
+  // only needs to keep the video frames advancing and push NDI frames.
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = 0;
 
     const loop = (time: number) => {
       animationFrameId = requestAnimationFrame(loop);
-      
+
       const isAlertActive = !!latestData.current?.alert;
       if (!isVideoPlayingRef.current && !isAlertActive) return;
-      
+
       // Throttle to NDI FPS (fallback to 30)
       const fps = ndiConfigRef.current.fps || 30;
       const interval = 1000 / fps;
-      
+
       if (time - lastTime >= interval) {
         lastTime = time - (time % interval);
         draw(time);
@@ -315,15 +385,30 @@ function BroadcastCanvas() {
   }, [draw, pushNdiFrame]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        width: "100vw",
-        height: "100vh",
-        display: "block",
-        objectFit: "contain",
-      }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: "100vw",
+          height: "100vh",
+          display: "block",
+          objectFit: "contain",
+        }}
+      />
+      {alertState && (
+        <div
+          className={`alert-overlay ${alertState.position === "top" ? "alert-overlay-top" : "alert-overlay-bottom"}`}
+        >
+          <span
+            ref={alertTextRef}
+            className="alert-marquee-text"
+            style={{ animationDuration: `${alertState.duration}s` }}
+          >
+            {alertState.text}
+          </span>
+        </div>
+      )}
+    </>
   )
 }
 

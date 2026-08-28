@@ -7,6 +7,7 @@ interface CanvasVerseProps {
   theme: BroadcastTheme
   verse: VerseRenderData | null
   alert?: string | null
+  alertPosition?: "top" | "bottom"
   className?: string
 }
 
@@ -14,6 +15,7 @@ export const CanvasVerse = memo(function CanvasVerse({
   theme,
   verse,
   alert,
+  alertPosition = "bottom",
   className,
 }: CanvasVerseProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -131,7 +133,7 @@ export const CanvasVerse = memo(function CanvasVerse({
     const render = (time: number = performance.now()) => {
       renderVerse(ctx, theme, verse, { scale, imageCache })
       if (alert) {
-        renderAlert(ctx, displayW, displayH, alert, time)
+        renderAlert(ctx, displayW, displayH, alert, time, alertPosition)
       }
       if (isVideoPlaying || alert) {
         animationFrameId = requestAnimationFrame(render)

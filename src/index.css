@@ -165,3 +165,43 @@
 #react-joyride-portal .react-joyride__spotlight {
   transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease;
 }
+
+/* Broadcast alert overlay marquee */
+@keyframes alert-marquee {
+  from {
+    transform: translateX(100vw);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.alert-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 11.11vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.alert-overlay-top {
+  top: 0;
+}
+
+.alert-overlay-bottom {
+  bottom: 0;
+}
+
+.alert-marquee-text {
+  color: #fbbf24;
+  font-weight: bold;
+  font-size: 5.93vh;
+  white-space: nowrap;
+  animation: alert-marquee linear infinite;
+  text-shadow: 0 0.19vh 0.37vh rgba(0, 0, 0, 0.5);
+  will-change: transform;
+}

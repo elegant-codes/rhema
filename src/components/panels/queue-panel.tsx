@@ -27,16 +27,27 @@ function QueueItemRow({
   isActive: boolean
   isHighlighted: boolean
 }) {
-  const handlePresent = () => {
+  const handlePresent = async () => {
     useQueueStore.getState().setActive(index)
     if (item.type === "song") {
       useBroadcastStore.getState().setLiveSongSlide(item.songId, 0)
     } else {
-      const verses = item.verses || (item.verse ? [item.verse] : [])
-      bibleActions.selectVerses(verses)
+      let verses = item.verses || (item.verse ? [item.verse] : [])
       const translationId = useBibleStore.getState().activeTranslationId
       const translation = useBibleStore.getState().translations
         .find(t => t.id === translationId)?.abbreviation ?? "KJV"
+
+      if (verses.length > 0 && (!verses[0].text || verses[0].text.trim() === "")) {
+        const fetched = await Promise.all(
+          verses.map(v => bibleActions.fetchVerse(v.book_number, v.chapter, v.verse, translationId))
+        )
+        const valid = fetched.filter((v): v is NonNullable<typeof v> => v !== null)
+        if (valid.length > 0) {
+          verses = valid
+        }
+      }
+
+      bibleActions.selectVerses(verses)
       useBroadcastStore.getState().setLiveVerse(toVerseRenderData(verses, translation))
       useBroadcastStore.getState().setLive(true)
       useHistoryStore.getState().addItem(verses, translationId)

@@ -134,4 +134,5 @@ export interface BroadcastPayload {
   theme: BroadcastTheme
   verse: VerseRenderData | null
   alert: string | null
+  alertPosition: "top" | "bottom"
 }

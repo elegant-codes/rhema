@@ -12,12 +12,6 @@ use crate::events::{
 };
 use crate::state::AppState;
 
-/// [DIAG] Running totals for AppState mutex contention on the direct-detection
-/// hot path. Direct-mode detection runs on every Final transcript fragment
-/// inside spawn_blocking, so high contention here means workers are stalling.
-static DIRECT_LOCK_OK: AtomicU64 = AtomicU64::new(0);
-static DIRECT_LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
-
 /// Truncate a string to at most `max_bytes`, snapping to a valid UTF-8 char boundary.
 fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
@@ -532,43 +526,10 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
 
     // Resolve verse info from DB (needs AppState, but only briefly for DB lookup)
     let app_managed: State<'_, Mutex<AppState>> = app.state();
-    let Ok(app_state) = app_managed.try_lock() else {
-        let bad = DIRECT_LOCK_CONTENDED.fetch_add(1, Ordering::Relaxed) + 1;
-        let good = DIRECT_LOCK_OK.load(Ordering::Relaxed);
-        log::warn!(
-            "[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad} — emitting without verse text"
-        );
-        // AppState locked — emit results without verse text
-        let results: Vec<super::detection::DetectionResult> = merged
-            .iter()
-            .map(|m| {
-                let vr = &m.detection.verse_ref;
-                super::detection::DetectionResult {
-                    verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                    verse_text: String::new(),
-                    book_name: vr.book_name.clone(),
-                    book_number: vr.book_number,
-                    chapter: vr.chapter,
-                    verse: vr.verse_start,
-                    confidence: m.detection.confidence,
-                    source: "direct".to_string(),
-                    auto_queued: m.auto_queued,
-                    transcript_snippet: m.detection.transcript_snippet.clone(),
-                    is_chapter_only: m.detection.is_chapter_only,
-                }
-            })
-            .collect();
-        for r in &results {
-            log::info!("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
-        }
-        let _ = app.emit("verse_detections", &results);
-        return has_high_confidence;
+    let Ok(app_state) = app_managed.lock() else {
+        log::error!("[DET-DIRECT] AppState lock poisoned");
+        return false;
     };
-    let ok = DIRECT_LOCK_OK.fetch_add(1, Ordering::Relaxed) + 1;
-    if ok % 50 == 0 {
-        let bad = DIRECT_LOCK_CONTENDED.load(Ordering::Relaxed);
-        log::info!("[DET-DIRECT] AppState lock stats ok={ok} contended={bad}");
-    }
     let results: Vec<super::detection::DetectionResult> = merged
         .iter()
         .map(|m| super::detection::to_result(&app_state, m))

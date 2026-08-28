@@ -1,4 +1,6 @@
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useBibleStore } from "@/stores/bible-store"
+import { useHistoryStore } from "@/stores/history-store"
 import type { VerseRenderData } from "@/types"
 import type { Verse } from "@/types"
 
@@ -91,6 +93,24 @@ export function deriveLiveVerse({
 }): VerseRenderData | null {
   if (!isLive || selectedVerses.length === 0) return null
   return toVerseRenderData(selectedVerses, translation)
+}
+
+/**
+ * Push a verse selection to the live output immediately. This is the multi-verse
+ * equivalent of upstream's single-verse `presentVerse`; it reuses the same path
+ * as the Preview panel's "Send to live" button.
+ */
+export async function presentVerses(verses: Verse[]): Promise<void> {
+  if (verses.length === 0) return
+  const bibleState = useBibleStore.getState()
+  const translation =
+    bibleState.translations.find((t) => t.id === bibleState.activeTranslationId)
+      ?.abbreviation ?? "KJV"
+  const verseData = toVerseRenderData(verses, translation)
+
+  useBroadcastStore.getState().setLiveVerse(verseData)
+  useBroadcastStore.getState().setLive(true)
+  useHistoryStore.getState().addItem(verses, bibleState.activeTranslationId)
 }
 
 export const broadcastActions = {

@@ -16,6 +16,7 @@ import {
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
 import { bibleActions } from "@/hooks/use-bible"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 import type { DetectionResult, ReadingAdvance } from "@/types"
 
 /**
@@ -75,6 +76,43 @@ export function TranscriptPanel() {
     (data) => {
       useBibleStore.getState().setActiveTranslation(data.translation_id)
       console.log(`[VOICE] Translation switched to ${data.abbreviation}`)
+
+      // In auto broadcast mode, refresh the current selection in the new
+      // translation and push it to live output immediately.
+      const { autoMode } = useSettingsStore.getState()
+      if (!autoMode) return
+
+      const verses = useBibleStore.getState().selectedVerses
+      if (verses.length === 0) return
+
+      Promise.all(
+        verses.map((v) =>
+          bibleActions.fetchVerse(v.book_number, v.chapter, v.verse)
+        )
+      )
+        .then((results) => {
+          const validVerses = results.filter(
+            (v): v is NonNullable<typeof v> => v !== null
+          )
+          if (validVerses.length === 0) return
+
+          bibleActions.selectVerses(validVerses)
+
+          const bibleStore = useBibleStore.getState()
+          const translation =
+            bibleStore.translations.find((t) => t.id === bibleStore.activeTranslationId)
+              ?.abbreviation ?? "KJV"
+          useBroadcastStore
+            .getState()
+            .setLiveVerse(toVerseRenderData(validVerses, translation))
+          useBroadcastStore.getState().setLive(true)
+          import("@/stores").then(({ useHistoryStore }) => {
+            useHistoryStore
+              .getState()
+              .addItem(validVerses, bibleStore.activeTranslationId)
+          })
+        })
+        .catch(() => {})
     }
   )
 
@@ -124,6 +162,36 @@ export function TranscriptPanel() {
               import("@/stores").then(({ useHistoryStore }) => {
                 useHistoryStore.getState().addItem([actualVerse], bibleStore.activeTranslationId)
               })
+
+              // Also mirror the displayed verse into the queue so recent
+              // detections and the queue stay in sync.
+              const queue = useQueueStore.getState()
+              const dupIdx = queue.findDuplicate(
+                actualVerse.book_number,
+                actualVerse.chapter,
+                actualVerse.verse,
+              )
+              if (dupIdx !== -1) {
+                queue.updateEarlyRef(
+                  actualVerse.book_number,
+                  actualVerse.chapter,
+                  actualVerse.verse,
+                  `${actualVerse.book_name} ${actualVerse.chapter}:${actualVerse.verse}`,
+                  actualVerse.text,
+                )
+                queue.setActive(dupIdx)
+              } else {
+                queue.addItem({
+                  id: crypto.randomUUID(),
+                  type: "verse",
+                  verses: [actualVerse],
+                  reference: `${actualVerse.book_name} ${actualVerse.chapter}:${actualVerse.verse}`,
+                  confidence: directHit.confidence,
+                  source: "ai-direct",
+                  added_at: Date.now(),
+                  is_chapter_only: false,
+                })
+              }
             }
           })
           .catch(console.error)
@@ -169,19 +237,33 @@ export function TranscriptPanel() {
           if (!d.is_chapter_only) queue.setActive(dupIdx)
           continue
         }
+        const activeTransId = useBibleStore.getState().activeTranslationId
+        const queueVerse = {
+          id: 0,
+          translation_id: activeTransId,
+          book_number: d.book_number,
+          book_name: d.book_name,
+          book_abbreviation: "",
+          chapter: d.chapter,
+          verse: d.verse,
+          text: d.verse_text,
+        }
+
+        if (!d.verse_text && d.book_number > 0 && d.chapter > 0 && d.verse > 0) {
+          bibleActions.fetchVerse(d.book_number, d.chapter, d.verse, activeTransId)
+            .then((v) => {
+              if (v?.text) {
+                useQueueStore.getState().updateEarlyRef(d.book_number, d.chapter, d.verse, d.verse_ref, v.text)
+                useDetectionStore.getState().updateDetectionText(d.verse_ref, v.text)
+              }
+            })
+            .catch(() => {})
+        }
+
         queue.addItem({
           id: crypto.randomUUID(),
           type: "verse",
-          verses: [{
-            id: 0,
-            translation_id: 1,
-            book_number: d.book_number,
-            book_name: d.book_name,
-            book_abbreviation: "",
-            chapter: d.chapter,
-            verse: d.verse,
-            text: d.verse_text,
-          }],
+          verses: [queueVerse],
           reference: d.verse_ref,
           confidence: d.confidence,
           source: d.source === "direct" ? "ai-direct" : "ai-semantic",

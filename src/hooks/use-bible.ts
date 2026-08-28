@@ -96,12 +96,21 @@ export const bibleActions = {
   searchVerses,
   semanticSearch,
   loadCrossReferences,
-  navigateToVerse: (bookNumber: number, chapter: number, verse: number) =>
+  navigateToVerse: (
+    bookNumber: number,
+    chapter: number,
+    verse: number,
+    present?: boolean
+  ) => {
     useBibleStore
       .getState()
-      .setPendingNavigation({ bookNumber, chapter, verse }),
+      .setPendingNavigation({ bookNumber, chapter, verse, present })
+    useBibleStore.getState().requestVerseReveal("nearest")
+  },
   selectVerses: (verses: Verse[]) =>
     useBibleStore.getState().selectVerses(verses),
+  requestVerseReveal: (block: ScrollLogicalPosition = "nearest") =>
+    useBibleStore.getState().requestVerseReveal(block),
 }
 
 // Hook for components that need reactive store data
